@@ -1,23 +1,28 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
-// Sayfalarımızı import edelim
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard'; // <-- Yeni Sayfa
+import MainLayout from './layouts/MainLayout'; // <-- Yeni Layout
 
 function App() {
   return (
-    <Router>
-      {/* Bildirim kutusu her yerde çalışsın diye en üste koyuyoruz */}
-      <ToastContainer position="top-right" autoClose={3000} />
-      
+    <BrowserRouter>
       <Routes>
+        {/* Halka Açık Sayfalar (Layoutsız) */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         
-        {/* Şimdilik ana sayfaya da Login koyalım, sonra Dashboard yapacağız */}
-        <Route path="/" element={<div style={{padding: 20}}><h1>Ana Sayfa</h1> <a href="/login">Giriş Yap</a></div>} />
+        {/* Korumalı ve Layoutlu Sayfalar */}
+        {/* MainLayout içinde Outlet var, altındaki route'lar oraya yerleşir */}
+        <Route element={<MainLayout />}>
+           <Route path="/dashboard" element={<Dashboard />} />
+           {/* İleride yapılacak sayfalar da buraya eklenecek */}
+           {/* <Route path="/directory" element={<Directory />} /> */}
+        </Route>
+
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
 

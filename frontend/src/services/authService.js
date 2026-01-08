@@ -1,23 +1,28 @@
 import api from './api';
 
-const authService = {
-  // Giriş Yapma
-  login: async (email, password) => {
-    // Backend'deki LoginDto yapısına uygun veri gönderiyoruz
-    const response = await api.post('/Auth/Login', { email, password });
-    return response.data; // Token döner
-  },
+// 1. "export const" diyerek süslü parantez ile çağrılabilmesini sağlıyoruz ({ login })
+// 2. Parametreyi (credentials) tek bir nesne olarak alıyoruz ki Login.jsx'den gelen formData ile uyuşsun.
 
-  // Kayıt Olma
-  register: async (userData) => {
-    const response = await api.post('/Auth/Register', userData);
-    return response.data;
-  },
-  
-  // Çıkış (Sadece token'ı sileriz)
-  logout: () => {
-    localStorage.removeItem('token');
-  }
+export const login = async (credentials) => {
+  // credentials şöyledir: { email: "...", password: "..." }
+  const response = await api.post('/Auth/Login', credentials);
+  return response.data; 
+};
+
+export const register = async (userData) => {
+  const response = await api.post('/Auth/Register', userData);
+  return response.data;
+};
+
+export const logout = () => {
+  localStorage.removeItem('token');
+};
+
+// İstersen "import authService from..." dendiğinde de çalışsın diye default bırakıyoruz
+const authService = {
+  login,
+  register,
+  logout
 };
 
 export default authService;

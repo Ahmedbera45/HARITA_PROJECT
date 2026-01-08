@@ -1,0 +1,101 @@
+📅 FAZ 1: TEMEL, KİMLİK VE GÜVENLİK (Foundation)
+Amacımız: Sistemin kapılarını açmak, yetkilendirmeyi kurmak ve ana iskeleti oturtmak.
+
+1.1. Backend (DB & API)
+
+[ ] Refactoring: Mevcut Directory entity'si ve controller'ı silinecek (Amaca uygun değil).
+
+[ ] Role & User Update: Şef (Admin/Manager) ve Personel rollerinin veritabanında "Seed Data" (başlangıç verisi) olarak oluşturulması.
+
+1.2. Frontend (UI/UX)
+
+[ ] Kurumsal Tema: Lacivert/Gri belediye temalı theme.js kurulumu.
+
+[ ] Login Sayfası: Split-screen tasarım, API bağlantısı.
+
+[ ] Layout (İskelet): Sol menü (Sidebar) ve Üst bar (Navbar). Menüde şu başlıklar olacak: Ana Sayfa, Görevler, İzinler, Rehber, Harçlar, Arşiv (Parseller).
+
+📅 FAZ 2: OPERASYONEL MODÜLLER (Quick Wins)
+Amacımız: Hızlıca bitirebileceğimiz, günlük işleri kolaylaştıran modülleri devreye almak.
+
+2.1. Kurum Rehberi (Corporate Memory)
+
+Backend: Contact Entity (Ad, Kurum, Birim, Tel, Email, Etiketler). CRUD işlemleri.
+
+Frontend: Arama ve filtreleme özellikli şık bir tablo (DataGrid). "Yeni Kişi Ekle" modalı.
+
+2.2. Görev Takip (Task Management)
+
+Backend: Mevcut AppTask güncellenecek -> Status (Bekliyor, Yapılıyor, Bitti), Priority (Acil, Normal) ve CompletionDate eklenecek.
+
+Frontend: Personel için "Görevlerim" listesi. Şef için "Görev Ata" ekranı.
+
+📅 FAZ 3: PERSONEL YÖNETİMİ (Leave Management)
+Amacımız: İzin süreçlerini dijitalleştirmek ve şef onayına sunmak.
+
+3.1. İzin Modülü
+
+Backend:
+
+LeaveRequest Entity: (User, StartDate, EndDate, Type, Status [Pending, Approved, Rejected], Description).
+
+Business Logic: Tarih çakışma kontrolü.
+
+Frontend:
+
+Personel: İzin talep formu ve geçmiş izinlerim listesi.
+
+Şef: Onay bekleyen izinler listesi ve Onay/Red butonları.
+
+Genel Takvim: "Şu an kim izinli?" görünümü.
+
+📅 FAZ 4: VERİ VE ARŞİV (Data Integration)
+Amacımız: Excel'deki verileri (Ruhsat/İmar) veritabanına alıp sorgulanabilir hale getirmek.
+
+4.1. Veri Tabanı Tasarımı
+
+Backend:
+
+LicenseParcel (Ruhsat Alanlar) Entity: Ada, Parsel, Ruhsat Tarihi, vb.
+
+ZoningParcel (İmar Durumu Alanlar) Entity: Ada, Parsel, Karar Tarihi, vb.
+
+Excel Import: .xlsx dosyasını okuyup bu tablolara kaydeden servis (EPPlus veya NPOI kütüphanesi ile).
+
+4.2. Arayüz
+
+Frontend:
+
+Excel Yükleme Butonu (Sadece yetkiliye).
+
+Gelişmiş Tablo: Ada/Parsel'e göre arama yapma, veriyi düzenleme ekranı.
+
+📅 FAZ 5: HARÇ VE HESAPLAMA (Calculation Engine)
+Amacımız: Sistemin beyni. Manuel hesaplamayı bitirmek.
+
+5.1. Parametre Yönetimi
+
+Backend: FeeParameter Entity. (Örn: "2024 Yılı m² Birim Fiyatı", "Tevhid Katsayısı"). Bu değerler kodun içinde değil, veritabanında olacak ki seneye değiştirebilesin.
+
+Frontend: Yönetici paneli -> "Parametreleri Güncelle" ekranı.
+
+5.2. Genel Harç Hesaplayıcı
+
+Frontend: Basit Hesap Makinesi gibi. Ada/Parsel gir -> Harç Türü Seç -> Sistem parametreleri çekip sonucu göstersin. (Kayıt tutmasına gerek yok, anlık hesap).
+
+📅 FAZ 6: TEVHİD SÜRECİ (Complex Workflow)
+Amacımız: Onay mekanizmalı, belgeli, en karmaşık süreç.
+
+6.1. Süreç Yönetimi
+
+Backend:
+
+TevhidProcess Entity: (Ada, Parsel, Dosyalar, Durum [Taslak, Şef Onayında, Onaylandı], Hesaplanan Tutar).
+
+Dosya Yükleme Servisi (PDF/Resim).
+
+Frontend:
+
+Adım Adım Sihirbaz (Step 1: Bilgiler, Step 2: Dosyalar, Step 3: Hesaplama ve Gönder).
+
+Şef Ekranı: Gelen dosyayı incele -> Onayla/Reddet.

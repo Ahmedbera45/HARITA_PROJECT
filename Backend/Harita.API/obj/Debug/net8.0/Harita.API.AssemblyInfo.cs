@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Harita.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+146af5c326c25795ea70e84a92b1638cdb490dfb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d8d279c98aa08b4bd7a881c68108a400d689c159")]
 [assembly: System.Reflection.AssemblyProductAttribute("Harita.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Harita.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
