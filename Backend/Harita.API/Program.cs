@@ -13,6 +13,16 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Controller yapısını projeye ekle
 builder.Services.AddControllers();
 
+// CORS Politikası: Frontend'den (localhost:5173) gelen isteklere izin ver
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin() // Güvenlik için canlıda sadece frontend URL'si verilir, şimdilik her yere açıyoruz
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 // 2. Swagger / OpenAPI dökümantasyonunu ekle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -92,6 +102,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthentication(); // Önce kimlik doğrula (Kimsin?)
+app.UseCors();
 app.UseAuthorization();  // Sonra yetkilendir (Ne yapabilirsin?)
 
 app.MapControllers(); // API Controller'larını çalıştır

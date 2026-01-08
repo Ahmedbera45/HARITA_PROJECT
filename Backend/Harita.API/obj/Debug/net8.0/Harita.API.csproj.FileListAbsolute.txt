@@ -112,3 +112,4 @@ C:\Users\ahmet.cakmak\Desktop\HARITA_PROJECT\backend\Harita.API\obj\Debug\net8.0
 C:\Users\ahmet.cakmak\Desktop\HARITA_PROJECT\backend\Harita.API\obj\Debug\net8.0\Harita.API.genruntimeconfig.cache
 C:\Users\ahmet.cakmak\Desktop\HARITA_PROJECT\backend\Harita.API\obj\Debug\net8.0\ref\Harita.API.dll
 C:\Users\ahmet.cakmak\Desktop\HARITA_PROJECT\backend\Harita.API\bin\Debug\net8.0\BCrypt.Net-Next.dll
+C:\Users\ahmet.cakmak\Desktop\HARITA_PROJECT\Backend\Harita.API\obj\Debug\net8.0\Harita.API.sourcelink.json
