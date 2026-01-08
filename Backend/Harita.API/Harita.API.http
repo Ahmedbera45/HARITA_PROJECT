@@ -1,0 +1,6 @@
+@Harita.API_HostAddress = http://localhost:5270
+
+GET {{Harita.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
