@@ -3,6 +3,7 @@ using System;
 using Harita.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Harita.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260109132240_AddContactModule")]
+    partial class AddContactModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -28,7 +31,7 @@ namespace Harita.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AssignedUserId")
+                    b.Property<Guid>("AssignedToUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -40,14 +43,11 @@ namespace Harita.API.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("DueDate")
+                    b.Property<DateTime>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("Priority")
-                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .HasColumnType("text");
@@ -55,21 +55,13 @@ namespace Harita.API.Migrations
                     b.Property<string>("Title")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("UserId1")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("AssignedUserId");
+                    b.HasIndex("AssignedToUserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("UserId1");
-
-                    b.ToTable("Tasks");
+                    b.ToTable("AppTasks");
                 });
 
             modelBuilder.Entity("Harita.API.Entities.Contact", b =>
@@ -194,20 +186,21 @@ namespace Harita.API.Migrations
 
             modelBuilder.Entity("Harita.API.Entities.AppTask", b =>
                 {
-                    b.HasOne("Harita.API.Entities.User", "AssignedUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Harita.API.Entities.User", null)
+                    b.HasOne("Harita.API.Entities.User", "AssignedToUser")
                         .WithMany("AssignedAppTasks")
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.HasOne("Harita.API.Entities.User", null)
+                    b.HasOne("Harita.API.Entities.User", "CreatedByUser")
                         .WithMany("CreatedAppTasks")
-                        .HasForeignKey("UserId1");
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.Navigation("AssignedUser");
+                    b.Navigation("AssignedToUser");
+
+                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("UserRole", b =>

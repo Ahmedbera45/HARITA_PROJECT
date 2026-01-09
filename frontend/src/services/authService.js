@@ -1,28 +1,27 @@
 import api from './api';
 
-// 1. "export const" diyerek süslü parantez ile çağrılabilmesini sağlıyoruz ({ login })
-// 2. Parametreyi (credentials) tek bir nesne olarak alıyoruz ki Login.jsx'den gelen formData ile uyuşsun.
-
 export const login = async (credentials) => {
-  // credentials şöyledir: { email: "...", password: "..." }
-  const response = await api.post('/Auth/Login', credentials);
-  return response.data; 
+  const response = await api.post('/Auth/login', credentials);
+  
+  // DİKKAT: Token'ı buraya kaydediyoruz
+  if (response.data.accessToken) {
+    localStorage.setItem('token', response.data.accessToken);
+  }
+  
+  return response.data;
 };
 
 export const register = async (userData) => {
-  const response = await api.post('/Auth/Register', userData);
+  const response = await api.post('/Auth/register', userData);
+  
+  // Kayıt olunca da otomatik giriş yapmış sayılırsın
+  if (response.data.accessToken) {
+    localStorage.setItem('token', response.data.accessToken);
+  }
+  
   return response.data;
 };
 
 export const logout = () => {
   localStorage.removeItem('token');
 };
-
-// İstersen "import authService from..." dendiğinde de çalışsın diye default bırakıyoruz
-const authService = {
-  login,
-  register,
-  logout
-};
-
-export default authService;

@@ -1,19 +1,20 @@
 import axios from 'axios';
 
-// Backend adresini buraya yazıyoruz (Senin swagger portun 5270 idi)
-const API_URL = 'http://localhost:5270/api';
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: 'http://localhost:5270/api', // Backend adresin
 });
 
-// Her istekten önce çalışır: Eğer localStorage'da token varsa onu Header'a ekler
+// Her istekten (Request) önce çalışacak kod:
 api.interceptors.request.use(
   (config) => {
+    // 1. LocalStorage'dan Token'ı al
     const token = localStorage.getItem('token');
+    
+    // 2. Eğer token varsa, isteğin başlığına ekle
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {

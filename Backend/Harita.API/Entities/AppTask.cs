@@ -1,19 +1,25 @@
-using System; // Guid ve DateTime için gerekli
-using Harita.API.Entities; // BaseEntity ve User aynı namespace'de ise bu satıra gerek kalmayabilir.
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Harita.API.Entities  // <-- BU SATIR EKSİKTİ
+namespace Harita.API.Entities
 {
     public class AppTask : BaseEntity
     {
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public string Status { get; set; }
-        public DateTime DueDate { get; set; }
+        public required string Title { get; set; }
+        public string? Description { get; set; }
+        public string Status { get; set; } = "Bekliyor";
+        public string Priority { get; set; } = "Orta";
+        public DateTime? DueDate { get; set; }
 
-        public Guid AssignedToUserId { get; set; }
-        public User AssignedToUser { get; set; }
+        // --- YENİ EKLENEN ALANLAR ---
+        
+        // Görevi kime atadık? (Boşsa havuza düşmüş demektir)
+        public Guid? AssignedUserId { get; set; }
+        
+        // Veritabanı ilişkisi (User tablosuyla bağlantı)
+        [ForeignKey("AssignedUserId")]
+        public User? AssignedUser { get; set; }
 
+        // Görevi kim oluşturdu? (Şef mi, kendisi mi?)
         public Guid CreatedByUserId { get; set; }
-        public User CreatedByUser { get; set; }
     }
 }

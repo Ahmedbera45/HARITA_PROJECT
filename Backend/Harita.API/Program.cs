@@ -1,45 +1,63 @@
+using System.Text;
 using Harita.API.Data;
+using Harita.API.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Harita.API.Services; // IAuthService için
-using Microsoft.AspNetCore.Authentication.JwtBearer; // JWT için
-using Microsoft.IdentityModel.Tokens; // Token validation için
-using System.Text; // Encoding için
-using Microsoft.OpenApi.Models; // <-- NOKTALI VİRGÜL EKLENDİ
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- SERVİSLERİN EKLENDİĞİ BÖLÜM ---
+// 1. Veritabanı Bağlantısı
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 1. Controller yapısını projeye ekle
-builder.Services.AddControllers();
+// 2. IHttpContextAccessor (Servislerde kullanıcıyı bulmak için şart)
+builder.Services.AddHttpContextAccessor();
 
-// CORS Politikası: Frontend'den (localhost:5173) gelen isteklere izin ver
-builder.Services.AddCors(options =>
+// 3. Kendi Servislerimiz
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IContactService, ContactService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
+
+// --- 4. JWT Authentication Ayarları (EKSİK OLAN KISIM BURASIYDI) ---
+var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "gizli_anahtar_en_az_32_karakter_olmali_12345");
+
+builder.Services.AddAuthentication(options =>
 {
-    options.AddDefaultPolicy(policy =>
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        policy.AllowAnyOrigin() // Güvenlik için canlıda sadece frontend URL'si verilir, şimdilik her yere açıyoruz
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false, // Şimdilik false (Development için)
+        ValidateAudience = false, // Şimdilik false
+        ClockSkew = TimeSpan.Zero
+    };
 });
-// 2. Swagger / OpenAPI dökümantasyonunu ekle
+// -------------------------------------------------------------------
+
+// 5. Controller ve Swagger
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Harita API", Version = "v1" });
-
-    // JWT Yetkilendirme Ayarı (Kilit butonu için)
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1NiIs...\"",
+        Description = "JWT Authorization header using the Bearer scheme.",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
@@ -48,63 +66,42 @@ builder.Services.AddSwaggerGen(c =>
                 {
                     Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
-                },
-                Scheme = "oauth2",
-                Name = "Bearer",
-                In = ParameterLocation.Header,
+                }
             },
-            new List<string>()
+            new string[] {}
         }
     });
 });
 
-// 3. Veritabanı Servisi (PostgreSQL Bağlantısı)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// 4. Servisleri sisteme tanıt (Dependency Injection)
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IDirectoryService, DirectoryService>();
-builder.Services.AddScoped<ITaskService, TaskService>();
-
-// 5. JWT Kimlik Doğrulama Ayarları
-builder.Services.AddAuthentication(options =>
+// 6. CORS
+builder.Services.AddCors(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    options.AddPolicy("AllowAll", builder =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        // "Jwt:Key" olarak düzelttik, appsettings.json ile uyumlu:
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-    };
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
 });
 
 var app = builder.Build();
 
-// --- HTTP REQUEST PIPELINE (MIDDLEWARE) AYARLARI ---
+// --- HTTP Request Pipeline ---
 
-// Geliştirme ortamındaysak Swagger ekranını aç
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+app.UseCors("AllowAll");
+
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // Önce kimlik doğrula (Kimsin?)
-app.UseCors();
-app.UseAuthorization();  // Sonra yetkilendir (Ne yapabilirsin?)
+// DİKKAT: Sıralama Çok Önemli!
+app.UseAuthentication(); // <-- Önce Kimlik Kontrolü
+app.UseAuthorization();  // <-- Sonra Yetki Kontrolü
 
-app.MapControllers(); // API Controller'larını çalıştır
+app.MapControllers();
 
 app.Run();

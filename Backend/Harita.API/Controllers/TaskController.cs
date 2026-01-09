@@ -1,50 +1,56 @@
-using System.Security.Claims;
 using Harita.API.DTOs;
 using Harita.API.Services;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization; // <-- EKLENDİ
 using Microsoft.AspNetCore.Mvc;
 
-namespace Harita.API.Controllers;
-[Authorize]
-[Route("api/[controller]")]
-[ApiController]
-public class TaskController : ControllerBase
+namespace Harita.API.Controllers
 {
-    private readonly ITaskService _taskService;
-
-    public TaskController(ITaskService taskService)
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class TaskController : ControllerBase
     {
-        _taskService = taskService;
-    }
+        private readonly ITaskService _taskService;
 
-    private Guid GetCurrentUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return userIdClaim != null ? Guid.Parse(userIdClaim.Value) : Guid.Empty;
-    }
+        public TaskController(ITaskService taskService)
+        {
+            _taskService = taskService;
+        }
 
-    [HttpGet("mytasks")]
-    public async Task<IActionResult> GetMyTasks()
-    {
-        var userId = GetCurrentUserId();
-        var result = await _taskService.GetMyTasksAsync(userId);
-        return Ok(result);
-    }
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var result = await _taskService.GetAllAsync();
+            return Ok(result);
+        }
 
-    [HttpPost("create")]
-    public async Task<IActionResult> Create([FromBody] CreateTaskDto dto)
-    {
-        var userId = GetCurrentUserId();
-        var result = await _taskService.CreateTaskAsync(dto, userId);
-        if (!result) return BadRequest();
-        return Ok("Görev oluşturuldu.");
-    }
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateTaskDto dto)
+        {
+            var result = await _taskService.CreateAsync(dto);
+            return Ok(result);
+        }
 
-    [HttpPut("update-status/{id}")]
-    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateTaskStatusDto dto)
-    {
-        var result = await _taskService.UpdateTaskStatusAsync(id, dto.Status);
-        if (!result) return NotFound();
-        return Ok("Görev durumu güncellendi.");
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(Guid id, UpdateTaskDto dto)
+        {
+            try 
+            {
+                var result = await _taskService.UpdateAsync(id, dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var result = await _taskService.DeleteAsync(id);
+            if (!result) return NotFound();
+            return NoContent();
+        }
     }
 }

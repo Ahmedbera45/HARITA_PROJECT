@@ -1,13 +1,11 @@
-using Harita.API.Data;
-using Harita.API.DTOs; // DTO'ların burada olduğundan emin ol
-using Harita.API.Entities;
-using Harita.API.Services; // IAuthService burada
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Harita.API.Data;
+using Harita.API.DTOs;
+using Harita.API.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Harita.API.Services
 {
@@ -22,86 +20,70 @@ namespace Harita.API.Services
             _configuration = configuration;
         }
 
-        public async Task<string> LoginAsync(LoginDto dto)
+        public async Task<TokenDto> LoginAsync(LoginDto dto)
         {
-            // 1. Kullanıcıyı Email ile bul (Username yerine Email)
-            var user = await _context.Users
-                .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(u => u.Email == dto.Email); // DTO'da Email olmalı
+            // Username yerine Email ile arıyoruz
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null) throw new Exception("Kullanıcı bulunamadı.");
 
-            if (user == null)
-                return null;
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+                throw new Exception("Şifre hatalı.");
 
-            // 2. Şifre Doğrulama (BinaryReader hatası burada çözüldü)
-            // BCrypt kütüphanesini kullandığını varsayıyorum
-            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-            
-            if (!isPasswordValid)
-                return null;
-
-            if (!user.IsActive) // Artık User sınıfında bu alan var
-                return null;
-
-            // 3. Token Oluştur
-            return GenerateJwtToken(user);
+            return GenerateToken(user);
         }
 
-        public async Task<bool> RegisterAsync(RegisterDto dto)
+        public async Task<TokenDto> RegisterAsync(RegisterDto dto)
         {
+            // Username yerine Email kontrolü
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
-                return false;
+                throw new Exception("Bu e-posta zaten kayıtlı.");
 
-            // Şifre Hashleme
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-
-            var newUser = new User
+            var user = new User
             {
-                Id = Guid.NewGuid(),
-                Email = dto.Email,
+                Email = dto.Email, // Username -> Email
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Name = dto.Name,
                 Surname = dto.Surname,
-                Department = dto.Department, // Artık User sınıfında var
-                PasswordHash = passwordHash,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                Department = dto.Department
             };
 
-            await _context.Users.AddAsync(newUser);
-            return await _context.SaveChangesAsync() > 0;
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return GenerateToken(user);
         }
 
-        private string GenerateJwtToken(User user)
+        private TokenDto GenerateToken(User user)
         {
+            var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "gizli_anahtar_en_az_32_karakter_olmali_12345");
+            var issuer = _configuration["Jwt:Issuer"] ?? "HaritaAPI";
+            var audience = _configuration["Jwt:Audience"] ?? "HaritaClient";
+
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                // FullName yerine Name ve Surname birleştiriyoruz
-                new Claim(ClaimTypes.Name, $"{user.Name} {user.Surname}") 
+                new Claim(ClaimTypes.Name, user.Email), // Username -> Email
+                new Claim("FullName", $"{user.Name} {user.Surname}"),
+                new Claim("Department", user.Department)
             };
 
-            // Rolleri ekle
-            foreach (var userRole in user.UserRoles)
+            var tokenDescriptor = new SecurityTokenDescriptor
             {
-                if(userRole.Role != null)
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
-                }
-            }
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddHours(24),
+                Issuer = issuer,
+                Audience = audience,
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
 
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddDays(1),
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return new TokenDto
+            {
+                AccessToken = tokenHandler.WriteToken(token),
+                ExpiresIn = 24 * 60 * 60
+            };
         }
     }
 }

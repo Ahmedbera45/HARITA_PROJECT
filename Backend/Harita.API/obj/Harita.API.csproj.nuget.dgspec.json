@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\Harita.API.csproj": {}
+    "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\Harita.API.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\Harita.API.csproj": {
+    "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\Harita.API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\Harita.API.csproj",
+        "projectUniqueName": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\Harita.API.csproj",
         "projectName": "Harita.API",
-        "projectPath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\Harita.API.csproj",
+        "projectPath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\Harita.API.csproj",
         "packagesPath": "C:\\Users\\ahmet.cakmak\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\obj\\",
+        "outputPath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ahmet.cakmak\\AppData\\Roaming\\NuGet\\NuGet.Config"

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "E/9lmJSK5+o=",
+  "dgSpecHash": "M2aL3L2d35A=",
   "success": true,
-  "projectFilePath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\Backend\\Harita.API\\Harita.API.csproj",
+  "projectFilePath": "C:\\Users\\ahmet.cakmak\\Desktop\\HARITA_PROJECT\\backend\\Harita.API\\Harita.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ahmet.cakmak\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512",
     "C:\\Users\\ahmet.cakmak\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
