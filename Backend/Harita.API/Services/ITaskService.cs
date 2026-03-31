@@ -4,14 +4,11 @@ namespace Harita.API.Services
 {
     public interface ITaskService
     {
-        // "GetMyTasks" yerine "GetAll" kullanıyoruz, çünkü içeride role göre filtreliyoruz
-        Task<List<TaskDto>> GetAllAsync(); 
-        
+        Task<List<TaskDto>> GetAllAsync(string? status = null, string? priority = null);
+        Task<TaskDto?> GetByIdAsync(Guid id);
         Task<TaskDto> CreateAsync(CreateTaskDto dto);
-        
-        // "UpdateTaskStatus" yerine genel "Update" kullanıyoruz
-        Task<TaskDto> UpdateAsync(Guid id, UpdateTaskDto dto); 
-        
+        Task<TaskDto> UpdateAsync(Guid id, UpdateTaskDto dto);
         Task<bool> DeleteAsync(Guid id);
+        Task<TaskSummaryDto> GetSummaryAsync();
     }
 }

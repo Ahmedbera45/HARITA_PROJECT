@@ -15,6 +15,10 @@ namespace Harita.API.Data
         public DbSet<AppTask> Tasks { get; set; }
         
         public DbSet<Contact> Contacts { get; set; }
+        public DbSet<LeaveRequest> LeaveRequests { get; set; }
+        public DbSet<Parcel> Parcels { get; set; }
+        public DbSet<ImportLog> ImportLogs { get; set; }
+        public DbSet<FeeCalculation> FeeCalculations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,10 +40,41 @@ namespace Harita.API.Data
 
             // GÖREV İLİŞKİLERİ (Hata veren yer burasıydı, düzelttik)
             modelBuilder.Entity<AppTask>()
-                .HasOne(t => t.AssignedUser) // Entity'de AssignedUser demiştik
-                .WithMany()
+                .HasOne(t => t.AssignedUser)
+                .WithMany(u => u.AssignedAppTasks)
                 .HasForeignKey(t => t.AssignedUserId)
-                .OnDelete(DeleteBehavior.Restrict); // Kullanıcı silinirse görevi silme
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AppTask>()
+                .HasOne<User>()
+                .WithMany(u => u.CreatedAppTasks)
+                .HasForeignKey(t => t.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // İzin Talepleri
+            modelBuilder.Entity<LeaveRequest>()
+                .HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LeaveRequest>()
+                .HasOne(l => l.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(l => l.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ImportLog>()
+                .HasOne(i => i.ImportedByUser)
+                .WithMany()
+                .HasForeignKey(i => i.ImportedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<FeeCalculation>()
+                .HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

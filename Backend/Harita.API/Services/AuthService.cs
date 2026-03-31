@@ -22,8 +22,9 @@ namespace Harita.API.Services
 
         public async Task<TokenDto> LoginAsync(LoginDto dto)
         {
-            // Username yerine Email ile arıyoruz
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var user = await _context.Users
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Email == dto.Email);
             if (user == null) throw new Exception("Kullanıcı bulunamadı.");
 
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
@@ -50,6 +51,18 @@ namespace Harita.API.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Yeni kullanıcıya varsayılan Staff rolü ver
+            var staffRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Staff");
+            if (staffRole != null)
+            {
+                _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = staffRole.Id });
+                await _context.SaveChangesAsync();
+            }
+
+            // Roller ile birlikte yeniden yükle
+            await _context.Entry(user).Collection(u => u.UserRoles).Query()
+                .Include(ur => ur.Role).LoadAsync();
+
             return GenerateToken(user);
         }
 
@@ -62,10 +75,20 @@ namespace Harita.API.Services
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Email), // Username -> Email
+                new Claim(ClaimTypes.Name, user.Email),
                 new Claim("FullName", $"{user.Name} {user.Surname}"),
-                new Claim("Department", user.Department)
+                new Claim("Department", user.Department ?? "")
             };
+
+            // Rol claim'lerini ekle
+            if (user.UserRoles != null)
+            {
+                foreach (var userRole in user.UserRoles)
+                {
+                    if (userRole.Role != null)
+                        claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
+                }
+            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {

@@ -1,0 +1,265 @@
+import { useState, useEffect, useRef } from 'react';
+import {
+  Box, Typography, Button, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Chip, Alert, LinearProgress,
+  TextField, InputAdornment, Stack, Divider, Tabs, Tab, Tooltip
+} from '@mui/material';
+import {
+  CloudUpload, History, Search, CheckCircle, Error as ErrorIcon,
+  TableChart, FileDownload
+} from '@mui/icons-material';
+import { toast } from 'react-toastify';
+import importService from '../services/importService';
+
+const fmt = (d) => d ? new Date(d).toLocaleString('tr-TR') : '-';
+
+export default function Import() {
+  const [tab, setTab] = useState(0);
+
+  // Upload state
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+  const fileInputRef = useRef();
+
+  // Log state
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // Parcel state
+  const [parcels, setParcels] = useState([]);
+  const [loadingParcels, setLoadingParcels] = useState(false);
+  const [mahalleFilter, setMahalleFilter] = useState('');
+  const [batchFilter, setBatchFilter] = useState('');
+
+  useEffect(() => {
+    if (tab === 1) fetchLogs();
+    if (tab === 2) fetchParcels();
+  }, [tab]);
+
+  const fetchLogs = async () => {
+    setLoadingLogs(true);
+    try { setLogs(await importService.getLogs()); }
+    catch { toast.error('Geçmiş yüklenemedi.'); }
+    finally { setLoadingLogs(false); }
+  };
+
+  const fetchParcels = async (params = {}) => {
+    setLoadingParcels(true);
+    try { setParcels(await importService.getParcels(params)); }
+    catch { toast.error('Parseller yüklenemedi.'); }
+    finally { setLoadingParcels(false); }
+  };
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (!f.name.match(/\.(xlsx|xls)$/i)) {
+      toast.warning('Sadece .xlsx veya .xls dosyaları kabul edilmektedir.');
+      return;
+    }
+    setFile(f);
+    setLastResult(null);
+  };
+
+  const handleUpload = async () => {
+    if (!file) { toast.warning('Önce dosya seçin.'); return; }
+    setUploading(true);
+    try {
+      const result = await importService.importParcels(file);
+      setLastResult(result);
+      if (result.errorRows === 0) {
+        toast.success(`${result.successRows} parsel başarıyla içe aktarıldı.`);
+      } else {
+        toast.warning(`${result.successRows} başarılı, ${result.errorRows} hatalı satır.`);
+      }
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (e) {
+      toast.error(e.response?.data || 'Yükleme başarısız.');
+    } finally { setUploading(false); }
+  };
+
+  const handleParcelSearch = () => {
+    fetchParcels({
+      ...(mahalleFilter && { mahalle: mahalleFilter }),
+      ...(batchFilter && { batchId: batchFilter })
+    });
+  };
+
+  // Şablon Excel indirme (tarayıcıda oluştur)
+  const downloadTemplate = () => {
+    const csv = 'Ada,Parsel,Mahalle,Mevkii,Alan,Nitelik,MalikAdi,PaftaNo\n100,1,Merkez,Aşağı Mahalle,500,Arsa,Ali Veli,10-B\n';
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'parsel_sablonu.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" fontWeight="bold">Excel Veri İçe Aktarma</Typography>
+        <Typography variant="body2" color="text.secondary">Parsel ve ruhsat verilerini Excel ile toplu yükleyin</Typography>
+      </Box>
+
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Tab label="Yükle" icon={<CloudUpload />} iconPosition="start" />
+        <Tab label="Geçmiş" icon={<History />} iconPosition="start" />
+        <Tab label="Parsel Listesi" icon={<TableChart />} iconPosition="start" />
+      </Tabs>
+
+      {/* ─── TAB 0: YÜKLE ─── */}
+      {tab === 0 && (
+        <Stack spacing={3}>
+          <Paper elevation={0} sx={{ p: 4, border: '2px dashed', borderColor: file ? 'primary.main' : 'divider', borderRadius: 3, textAlign: 'center' }}>
+            <CloudUpload sx={{ fontSize: 56, color: file ? 'primary.main' : 'text.disabled', mb: 1 }} />
+            <Typography variant="h6" gutterBottom>
+              {file ? file.name : 'Excel Dosyası Seçin'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {file ? `${(file.size / 1024).toFixed(1)} KB` : '.xlsx veya .xls — maksimum 10 MB'}
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="center">
+              <Button variant="outlined" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                Dosya Seç
+              </Button>
+              <Button variant="contained" onClick={handleUpload} disabled={!file || uploading} startIcon={<CloudUpload />}>
+                {uploading ? 'Yükleniyor...' : 'İçe Aktar'}
+              </Button>
+              <Tooltip title="CSV formatında şablon indir">
+                <Button variant="text" startIcon={<FileDownload />} onClick={downloadTemplate}>
+                  Şablon
+                </Button>
+              </Tooltip>
+            </Stack>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
+            {uploading && <LinearProgress sx={{ mt: 2 }} />}
+          </Paper>
+
+          {/* Şablon bilgi kutusu */}
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            <strong>Excel sütun başlıkları (zorunlu: Ada, Parsel, Mahalle):</strong><br />
+            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo
+          </Alert>
+
+          {/* Sonuç kutusu */}
+          {lastResult && (
+            <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: lastResult.errorRows > 0 ? 'warning.main' : 'success.main', borderRadius: 2 }}>
+              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+                <Chip icon={<CheckCircle />} label={`${lastResult.successRows} başarılı`} color="success" />
+                {lastResult.errorRows > 0 && (
+                  <Chip icon={<ErrorIcon />} label={`${lastResult.errorRows} hatalı`} color="error" />
+                )}
+                <Chip label={`Batch: ${lastResult.batchId}`} size="small" variant="outlined" />
+              </Stack>
+              {lastResult.errors.length > 0 && (
+                <Box sx={{ maxHeight: 160, overflowY: 'auto' }}>
+                  {lastResult.errors.map((e, i) => (
+                    <Typography key={i} variant="caption" color="error" sx={{ display: 'block' }}>• {e}</Typography>
+                  ))}
+                </Box>
+              )}
+            </Paper>
+          )}
+        </Stack>
+      )}
+
+      {/* ─── TAB 1: GEÇMİŞ ─── */}
+      {tab === 1 && (
+        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'background.default' }}>
+                <TableCell><strong>Dosya Adı</strong></TableCell>
+                <TableCell><strong>Batch ID</strong></TableCell>
+                <TableCell><strong>Toplam</strong></TableCell>
+                <TableCell><strong>Başarılı</strong></TableCell>
+                <TableCell><strong>Hatalı</strong></TableCell>
+                <TableCell><strong>Yükleyen</strong></TableCell>
+                <TableCell><strong>Tarih</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loadingLogs ? (
+                <TableRow><TableCell colSpan={7} align="center"><LinearProgress /></TableCell></TableRow>
+              ) : logs.length === 0 ? (
+                <TableRow><TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>Henüz içe aktarma yapılmamış</TableCell></TableRow>
+              ) : logs.map(l => (
+                <TableRow key={l.id} hover>
+                  <TableCell>{l.fileName}</TableCell>
+                  <TableCell><Chip label={l.batchId} size="small" variant="outlined" /></TableCell>
+                  <TableCell>{l.totalRows}</TableCell>
+                  <TableCell><Chip label={l.successRows} size="small" color="success" /></TableCell>
+                  <TableCell>
+                    {l.errorRows > 0
+                      ? <Chip label={l.errorRows} size="small" color="error" />
+                      : <Chip label="0" size="small" color="default" />}
+                  </TableCell>
+                  <TableCell>{l.importedBy}</TableCell>
+                  <TableCell>{fmt(l.createdAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* ─── TAB 2: PARSEL LİSTESİ ─── */}
+      {tab === 2 && (
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Mahalle Ara" size="small" sx={{ minWidth: 200 }}
+              value={mahalleFilter}
+              onChange={e => setMahalleFilter(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
+              onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
+            />
+            <TextField
+              label="Batch ID" size="small" sx={{ minWidth: 200 }}
+              value={batchFilter}
+              onChange={e => setBatchFilter(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
+            />
+            <Button variant="outlined" onClick={handleParcelSearch}>Ara</Button>
+            <Button variant="text" onClick={() => { setMahalleFilter(''); setBatchFilter(''); fetchParcels(); }}>Temizle</Button>
+          </Stack>
+
+          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'background.default' }}>
+                  {['Ada', 'Parsel', 'Mahalle', 'Mevkii', 'Alan (m²)', 'Nitelik', 'Malik Adı', 'Pafta No', 'Batch'].map(h => (
+                    <TableCell key={h}><strong>{h}</strong></TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loadingParcels ? (
+                  <TableRow><TableCell colSpan={9} align="center"><LinearProgress /></TableCell></TableRow>
+                ) : parcels.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} align="center" sx={{ color: 'text.secondary', py: 4 }}>Parsel bulunamadı</TableCell></TableRow>
+                ) : parcels.map(p => (
+                  <TableRow key={p.id} hover>
+                    <TableCell>{p.ada}</TableCell>
+                    <TableCell>{p.parsel}</TableCell>
+                    <TableCell>{p.mahalle}</TableCell>
+                    <TableCell>{p.mevkii || '-'}</TableCell>
+                    <TableCell>{p.alan != null ? p.alan.toLocaleString('tr-TR') : '-'}</TableCell>
+                    <TableCell>{p.nitelik || '-'}</TableCell>
+                    <TableCell>{p.malikAdi || '-'}</TableCell>
+                    <TableCell>{p.paftaNo || '-'}</TableCell>
+                    <TableCell><Chip label={p.importBatchId} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Typography variant="caption" color="text.secondary">{parcels.length} kayıt listeleniyor</Typography>
+        </Stack>
+      )}
+    </Box>
+  );
+}

@@ -30,4 +30,12 @@ namespace Harita.API.DTOs
     
     // UpdateTaskDto aynen kalabilir (CreateTaskDto'dan miras alıyor zaten)
     public class UpdateTaskDto : CreateTaskDto { }
+
+    public class TaskSummaryDto
+    {
+        public int Pending { get; set; }
+        public int InProgress { get; set; }
+        public int Done { get; set; }
+        public int Total { get; set; }
+    }
 }

@@ -8,6 +8,7 @@ namespace Harita.API.DTOs
         public string LastName { get; set; } = string.Empty;
         public string? Title { get; set; }
         public string? Institution { get; set; }
+        public string? Department { get; set; }
         public string? PhoneNumber { get; set; }
         public string? Email { get; set; }
         public string? Description { get; set; }

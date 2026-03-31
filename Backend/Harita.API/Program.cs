@@ -1,6 +1,7 @@
 using System.Text;
 using Harita.API.Data;
 using Harita.API.Services;
+using Harita.API.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -84,7 +85,20 @@ builder.Services.AddCors(options =>
     });
 });
 
+// UserService, LeaveService, ImportService
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ILeaveService, LeaveService>();
+builder.Services.AddScoped<IImportService, ImportService>();
+builder.Services.AddScoped<IFeeCalculationService, FeeCalculationService>();
+
 var app = builder.Build();
+
+// Veritabanı seeding
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DbSeeder.SeedAsync(db);
+}
 
 // --- HTTP Request Pipeline ---
 

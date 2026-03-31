@@ -24,6 +24,7 @@ namespace Harita.API.Services
                     LastName = c.LastName,
                     Title = c.Title,
                     Institution = c.Institution,
+                    Department = c.Department,
                     PhoneNumber = c.PhoneNumber,
                     Email = c.Email,
                     Description = c.Description
@@ -43,6 +44,7 @@ namespace Harita.API.Services
                 LastName = c.LastName,
                 Title = c.Title,
                 Institution = c.Institution,
+                Department = c.Department,
                 PhoneNumber = c.PhoneNumber,
                 Email = c.Email,
                 Description = c.Description
@@ -73,8 +75,10 @@ namespace Harita.API.Services
                 LastName = contact.LastName,
                 Title = contact.Title,
                 Institution = contact.Institution,
+                Department = contact.Department,
                 PhoneNumber = contact.PhoneNumber,
-                Email = contact.Email
+                Email = contact.Email,
+                Description = contact.Description
             };
         }
 
@@ -113,6 +117,7 @@ namespace Harita.API.Services
             LastName = contact.LastName,
             Title = contact.Title,
             Institution = contact.Institution,
+            Department = contact.Department,
             PhoneNumber = contact.PhoneNumber,
             Email = contact.Email,
             Description = contact.Description

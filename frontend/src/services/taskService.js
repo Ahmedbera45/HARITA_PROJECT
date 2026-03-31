@@ -1,29 +1,12 @@
 import api from './api';
 
 const taskService = {
-  // Tüm görevleri getir
-  getAll: async () => {
-    const response = await api.get('/Task');
-    return response.data;
-  },
-
-  // Yeni görev oluştur
-  create: async (data) => {
-    const response = await api.post('/Task', data);
-    return response.data;
-  },
-
-  // Görevi güncelle (Durum, Başlık vb.)
-  update: async (id, data) => {
-    const response = await api.put(`/Task/${id}`, data);
-    return response.data;
-  },
-
-  // Görevi sil
-  delete: async (id) => {
-    const response = await api.delete(`/Task/${id}`);
-    return response.data;
-  }
+  getAll: (params = {}) => api.get('/Task', { params }).then(r => r.data),
+  getById: (id) => api.get(`/Task/${id}`).then(r => r.data),
+  getSummary: () => api.get('/Task/summary').then(r => r.data),
+  create: (data) => api.post('/Task', data).then(r => r.data),
+  update: (id, data) => api.put(`/Task/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/Task/${id}`).then(r => r.data),
 };
 
 export default taskService;

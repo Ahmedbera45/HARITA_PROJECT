@@ -18,9 +18,24 @@ namespace Harita.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? priority)
         {
-            var result = await _taskService.GetAllAsync();
+            var result = await _taskService.GetAllAsync(status, priority);
+            return Ok(result);
+        }
+
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummary()
+        {
+            var result = await _taskService.GetSummaryAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var result = await _taskService.GetByIdAsync(id);
+            if (result == null) return NotFound();
             return Ok(result);
         }
 

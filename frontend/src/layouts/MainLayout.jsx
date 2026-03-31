@@ -1,5 +1,5 @@
 // src/layouts/MainLayout.jsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Box, 
@@ -20,12 +20,15 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
-import { 
-  Menu as MenuIcon, 
-  Dashboard as DashboardIcon, 
-  People as PeopleIcon, 
-  Assignment as AssignmentIcon, 
+import {
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Assignment as AssignmentIcon,
   Map as MapIcon,
+  BeachAccess as LeaveIcon,
+  FileUpload as ImportIcon,
+  Calculate as CalculateIcon,
   Logout,
   Settings,
   ChevronLeft
@@ -37,18 +40,36 @@ const DRAWER_WIDTH = 260;
 
 // MENÜ ELEMANLARI
 const MENU_ITEMS = [
-  { text: 'Ana Sayfa', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Kurum Rehberi', icon: <PeopleIcon />, path: '/directory' }, // İleride yapılacak
-  { text: 'Görev Takip', icon: <AssignmentIcon />, path: '/tasks' },   // İleride yapılacak
-  { text: 'Harita / CBS', icon: <MapIcon />, path: '/map' },
+  { text: 'Ana Sayfa',     icon: <DashboardIcon />,  path: '/dashboard' },
+  { text: 'Kurum Rehberi', icon: <PeopleIcon />,     path: '/directory' },
+  { text: 'Görev Takip',   icon: <AssignmentIcon />, path: '/tasks' },
+  { text: 'İzin Yönetimi', icon: <LeaveIcon />,   path: '/leaves' },
+  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import' },
+  { text: 'Harç Hesaplama', icon: <CalculateIcon />, path: '/fee-calculation' },
+  { text: 'Harita / CBS',   icon: <MapIcon />,        path: '/map' },
 ];
+
+function parseJwtUser() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return { name: '', department: '' };
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const fullName = payload['FullName'] || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || '';
+    const department = payload['Department'] || '';
+    return { name: fullName, department };
+  } catch {
+    return { name: '', department: '' };
+  }
+}
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
+
+  const currentUser = useMemo(() => parseJwtUser(), []);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null); // Profil menüsü için
 
@@ -137,11 +158,11 @@ export default function MainLayout() {
           {/* Profil ve Çıkış */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-              <Typography variant="subtitle2" fontWeight="bold">Ahmet Bera Çakmak</Typography>
-              <Typography variant="caption" color="text.secondary">İmar ve Şehircilik Md.</Typography>
+              <Typography variant="subtitle2" fontWeight="bold">{currentUser.name || 'Kullanıcı'}</Typography>
+              <Typography variant="caption" color="text.secondary">{currentUser.department}</Typography>
             </Box>
             <IconButton onClick={handleMenuOpen} sx={{ p: 0.5, border: '1px solid', borderColor: 'divider' }}>
-               <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>A</Avatar>
+               <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>{(currentUser.name || 'K')[0]}</Avatar>
             </IconButton>
             <Menu
               anchorEl={anchorEl}

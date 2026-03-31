@@ -1,16 +1,17 @@
 // src/pages/Dashboard.jsx
-import React from 'react';
-import { Box, Grid, Paper, Typography, Button } from '@mui/material';
-import { 
-  Assignment, 
-  People, 
-  Map, 
+import { useState, useEffect } from 'react';
+import { Box, Grid, Paper, Typography, Button, CircularProgress } from '@mui/material';
+import {
+  Assignment,
+  People,
+  Map,
   PendingActions,
-  ArrowForward 
+  ArrowForward
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
-// İstatistik Kartı Bileşeni (Kod tekrarını önlemek için)
-const StatCard = ({ title, value, icon, color, subText }) => (
+const StatCard = ({ title, value, icon, color, subText, loading }) => (
   <Paper
     elevation={0}
     sx={{
@@ -35,7 +36,7 @@ const StatCard = ({ title, value, icon, color, subText }) => (
         {icon}
       </Box>
       <Typography variant="h4" fontWeight="bold" color="text.primary">
-        {value}
+        {loading ? <CircularProgress size={28} /> : value}
       </Typography>
     </Box>
     <Box>
@@ -50,9 +51,19 @@ const StatCard = ({ title, value, icon, color, subText }) => (
 );
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/Task/summary')
+      .then(res => setSummary(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <Box>
-      {/* BAŞLIK ALANI */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
@@ -62,58 +73,60 @@ export default function Dashboard() {
             Hoşgeldiniz, günlük iş özetiniz aşağıdadır.
           </Typography>
         </div>
-        <Button variant="contained" startIcon={<PendingActions />}>
-          Yeni Talep Oluştur
+        <Button variant="contained" startIcon={<PendingActions />} onClick={() => navigate('/tasks')}>
+          Görev Takibine Git
         </Button>
       </Box>
 
-      {/* İSTATİSTİK KARTLARI */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Bekleyen Görevler" 
-            value="12" 
-            icon={<Assignment />} 
-            color="#f59e0b" // Amber
-            subText="3 tanesi acil durumda"
+          <StatCard
+            title="Bekleyen Görevler"
+            value={summary?.pending ?? '-'}
+            icon={<Assignment />}
+            color="#f59e0b"
+            subText="Henüz başlanmamış görevler"
+            loading={loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Aktif Ruhsat Süreçleri" 
-            value="45" 
-            icon={<Map />} 
-            color="#3b82f6" // Blue
-            subText="Bu ay 8 yeni başvuru"
+          <StatCard
+            title="Devam Eden Görevler"
+            value={summary?.inProgress ?? '-'}
+            icon={<Map />}
+            color="#3b82f6"
+            subText="Şu an üzerinde çalışılanlar"
+            loading={loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Kayıtlı Kurum/Kişi" 
-            value="1,204" 
-            icon={<People />} 
-            color="#10b981" // Green
-            subText="Rehber veritabanı"
+          <StatCard
+            title="Tamamlanan Görevler"
+            value={summary?.done ?? '-'}
+            icon={<People />}
+            color="#10b981"
+            subText="Bitti statüsündeki görevler"
+            loading={loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Tamamlanan İşler" 
-            value="89%" 
-            icon={<PendingActions />} 
-            color="#6366f1" // Indigo
-            subText="Geçen aya göre +%5 artış"
+          <StatCard
+            title="Toplam Görev"
+            value={summary?.total ?? '-'}
+            icon={<PendingActions />}
+            color="#6366f1"
+            subText="Tüm görevlerin toplamı"
+            loading={loading}
           />
         </Grid>
       </Grid>
 
-      {/* ALT BİLGİ ALANI (İleride Tablo Gelecek) */}
       <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default', border: '1px dashed', borderColor: 'divider' }}>
         <Typography variant="h6" color="text.secondary">
           Son Hareketler Tablosu Buraya Gelecek
         </Typography>
-        <Button endIcon={<ArrowForward />} sx={{ mt: 2 }}>
-          Tüm Raporları Gör
+        <Button endIcon={<ArrowForward />} sx={{ mt: 2 }} onClick={() => navigate('/tasks')}>
+          Görev Panosuna Git
         </Button>
       </Paper>
     </Box>

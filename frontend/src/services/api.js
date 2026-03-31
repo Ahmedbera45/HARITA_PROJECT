@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5270/api', // Backend adresin
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5270/api',
 });
 
 // Her istekten (Request) önce çalışacak kod:
