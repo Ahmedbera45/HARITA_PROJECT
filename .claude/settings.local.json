@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(while read:*)",
+      "Bash(do echo:*)",
+      "Bash(git show:*)",
+      "Bash(done)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet add:*)",
+      "Bash(del \"c:\\\\Users\\\\ahmet.cakmak\\\\HaritaProject\\\\HARITA_PROJECT\\\\Backend\\\\Harita.Tests\\\\UnitTest1.cs\")",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(grep -E \"^.*error CS|Hata$|Error$\")",
+      "Bash(grep -E \"error CS|^Build|Hata$\")",
+      "Bash(taskkill /PID 31336 /F)"
+    ]
+  }
+}

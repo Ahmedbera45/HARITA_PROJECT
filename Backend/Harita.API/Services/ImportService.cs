@@ -164,7 +164,7 @@ namespace Harita.API.Services
                     TotalRows   = l.TotalRows,
                     SuccessRows = l.SuccessRows,
                     ErrorRows   = l.ErrorRows,
-                    ImportedBy  = l.ImportedByUser.Name + " " + l.ImportedByUser.Surname,
+                    ImportedBy  = l.ImportedByUser != null ? l.ImportedByUser.Name + " " + l.ImportedByUser.Surname : "—",
                     CreatedAt   = l.CreatedAt
                 })
                 .ToListAsync();
