@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import taskService from '../services/taskService';
 import userService from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
 
 const stringToColor = (string) => {
   let hash = 0;
@@ -30,18 +31,6 @@ const formatDate = (dateString) => {
   if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('tr-TR');
 };
-
-function getRole() {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role']
-      || payload['role']
-      || null;
-    return role;
-  } catch { return null; }
-}
 
 const PRIORITY_COLORS = { Düşük: 'success', Orta: 'warning', Yüksek: 'error' };
 
@@ -72,8 +61,7 @@ export default function Tasks() {
   const [assignTarget, setAssignTarget] = useState(null);
   const [assignUserId, setAssignUserId] = useState('');
 
-  const currentRole = getRole();
-  const isManager = currentRole === 'Manager' || currentRole === 'Admin';
+  const { isManager } = useAuth();
 
   useEffect(() => {
     fetchTasks();

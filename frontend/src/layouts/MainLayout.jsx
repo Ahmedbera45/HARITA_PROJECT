@@ -29,24 +29,27 @@ import {
   BeachAccess as LeaveIcon,
   FileUpload as ImportIcon,
   Calculate as CalculateIcon,
+  AdminPanelSettings as AdminIcon,
   Logout,
   Settings,
   ChevronLeft
 } from '@mui/icons-material';
 import { logout } from '../services/authService';
-import logo from '../assets/logo.png'; // Logoyu burada da kullanıyoruz
+import { useAuth } from '../hooks/useAuth';
+import logo from '../assets/logo.png';
 
 const DRAWER_WIDTH = 260;
 
-// MENÜ ELEMANLARI
-const MENU_ITEMS = [
-  { text: 'Ana Sayfa',     icon: <DashboardIcon />,  path: '/dashboard' },
-  { text: 'Kurum Rehberi', icon: <PeopleIcon />,     path: '/directory' },
-  { text: 'Görev Takip',   icon: <AssignmentIcon />, path: '/tasks' },
-  { text: 'İzin Yönetimi', icon: <LeaveIcon />,   path: '/leaves' },
-  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import' },
-  { text: 'Harç Hesaplama', icon: <CalculateIcon />, path: '/fee-calculation' },
-  { text: 'Harita / CBS',   icon: <MapIcon />,        path: '/map' },
+// Tüm menü öğeleri — roles: hangi roller görebilir (boş = herkes)
+const ALL_MENU_ITEMS = [
+  { text: 'Ana Sayfa',       icon: <DashboardIcon />,  path: '/dashboard',      roles: [] },
+  { text: 'Kurum Rehberi',   icon: <PeopleIcon />,     path: '/directory',      roles: [] },
+  { text: 'Görev Takip',     icon: <AssignmentIcon />, path: '/tasks',          roles: [] },
+  { text: 'İzin Yönetimi',   icon: <LeaveIcon />,      path: '/leaves',         roles: [] },
+  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',         roles: ['Admin', 'Manager'] },
+  { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation',roles: ['Admin', 'Manager'] },
+  { text: 'Harita / CBS',    icon: <MapIcon />,         path: '/map',            roles: [] },
+  { text: 'Kullanıcı Yön.', icon: <AdminIcon />,       path: '/users',          roles: ['Admin'] },
 ];
 
 function parseJwtUser() {
@@ -67,8 +70,14 @@ export default function MainLayout() {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { role } = useAuth();
 
   const currentUser = useMemo(() => parseJwtUser(), []);
+
+  // Role göre menü öğelerini filtrele
+  const MENU_ITEMS = ALL_MENU_ITEMS.filter(item =>
+    item.roles.length === 0 || item.roles.includes(role)
+  );
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null); // Profil menüsü için

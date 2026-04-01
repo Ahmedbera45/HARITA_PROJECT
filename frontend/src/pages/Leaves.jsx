@@ -8,16 +8,7 @@ import {
 import { Add, Delete, CheckCircle, Cancel, HourglassEmpty } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import leaveService from '../services/leaveService';
-
-// JWT'den rol parse
-function getRole() {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-    const p = JSON.parse(atob(token.split('.')[1]));
-    return p['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || p['role'] || null;
-  } catch { return null; }
-}
+import { useAuth } from '../hooks/useAuth';
 
 const STATUS_CHIP = {
   Bekliyor:   { color: 'warning', icon: <HourglassEmpty fontSize="inherit" /> },
@@ -47,8 +38,7 @@ export default function Leaves() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  const role = getRole();
-  const isManager = role === 'Manager' || role === 'Admin';
+  const { isManager } = useAuth();
 
   useEffect(() => { fetchLeaves(); }, []);
 

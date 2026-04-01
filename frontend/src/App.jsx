@@ -9,10 +9,22 @@ import ComingSoon from './pages/ComingSoon';
 import Leaves from './pages/Leaves';
 import Import from './pages/Import';
 import FeeCalculation from './pages/FeeCalculation';
+import Users from './pages/Users';
+import { useAuth } from './hooks/useAuth';
 
+// Token var mı kontrolü
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" replace />;
+}
+
+// Rol bazlı rota koruması: yetkisizse /dashboard'a yönlendir
+function RoleRoute({ children, roles }) {
+  const { role } = useAuth();
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" replace />;
+  if (!roles.includes(role)) return <Navigate to="/dashboard" replace />;
+  return children;
 }
 
 function App() {
@@ -26,13 +38,31 @@ function App() {
 
         {/* Korumalı ve Layoutlu Sayfalar */}
         <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+          {/* Tüm roller */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/directory" element={<Directory />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/leaves" element={<Leaves />} />
-          <Route path="/import" element={<Import />} />
-          <Route path="/fee-calculation" element={<FeeCalculation />} />
           <Route path="/map" element={<ComingSoon title="Harita / CBS" />} />
+
+          {/* Manager + Admin */}
+          <Route path="/import" element={
+            <RoleRoute roles={['Admin', 'Manager']}>
+              <Import />
+            </RoleRoute>
+          } />
+          <Route path="/fee-calculation" element={
+            <RoleRoute roles={['Admin', 'Manager']}>
+              <FeeCalculation />
+            </RoleRoute>
+          } />
+
+          {/* Sadece Admin */}
+          <Route path="/users" element={
+            <RoleRoute roles={['Admin']}>
+              <Users />
+            </RoleRoute>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>
