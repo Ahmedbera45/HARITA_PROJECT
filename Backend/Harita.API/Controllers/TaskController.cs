@@ -42,8 +42,15 @@ namespace Harita.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(CreateTaskDto dto)
         {
-            var result = await _taskService.CreateAsync(dto);
-            return Ok(result);
+            try
+            {
+                var result = await _taskService.CreateAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPut("{id}")]

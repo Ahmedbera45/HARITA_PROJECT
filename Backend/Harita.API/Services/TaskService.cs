@@ -140,22 +140,29 @@ namespace Harita.API.Services
             task.Status = dto.Status;
             task.Priority = dto.Priority;
             task.DueDate = dto.DueDate;
-            
-            if (dto.AssignedUserId.HasValue)
-            {
-                task.AssignedUserId = dto.AssignedUserId;
-            }
+            task.AssignedUserId = dto.AssignedUserId; // null = atamayı kaldır
 
             await _context.SaveChangesAsync();
-            
-            return new TaskDto 
-            { 
-                Id = task.Id, 
-                Title = task.Title, 
+
+            string? assignedUserName = null;
+            if (task.AssignedUserId.HasValue)
+            {
+                var assignedUser = await _context.Users.FindAsync(task.AssignedUserId.Value);
+                if (assignedUser != null)
+                    assignedUserName = $"{assignedUser.Name} {assignedUser.Surname}";
+            }
+
+            return new TaskDto
+            {
+                Id = task.Id,
+                Title = task.Title,
+                Description = task.Description,
                 Status = task.Status,
                 Priority = task.Priority,
                 DueDate = task.DueDate,
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                AssignedUserId = task.AssignedUserId,
+                AssignedUserName = assignedUserName ?? "Atanmamış"
             };
         }
 

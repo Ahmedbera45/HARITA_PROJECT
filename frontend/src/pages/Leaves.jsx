@@ -59,6 +59,14 @@ export default function Leaves() {
     finally { setLoading(false); }
   };
 
+  const getErrMsg = (e) => {
+    const d = e.response?.data;
+    if (!d) return 'İşlem başarısız.';
+    if (typeof d === 'string') return d;
+    if (d.title) return d.title;
+    return 'İşlem başarısız.';
+  };
+
   const handleCreate = async () => {
     if (!form.startDate || !form.endDate) { toast.warning('Tarihler zorunludur.'); return; }
     if (new Date(form.endDate) < new Date(form.startDate)) { toast.warning('Bitiş tarihi başlangıçtan önce olamaz.'); return; }
@@ -67,9 +75,10 @@ export default function Leaves() {
       await leaveService.create(form);
       toast.success('İzin talebi oluşturuldu.');
       setCreateOpen(false);
+      setForm({ leaveType: 'Yıllık İzin', startDate: '', endDate: '', description: '' });
       fetchLeaves();
     } catch (e) {
-      toast.error(e.response?.data || 'İşlem başarısız.');
+      toast.error(getErrMsg(e));
     } finally { setSaving(false); }
   };
 
@@ -77,11 +86,11 @@ export default function Leaves() {
     setSaving(true);
     try {
       await leaveService.review(reviewTarget.id, reviewForm);
-      toast.success(`Talep ${reviewForm.decision}.`);
+      toast.success(`Talep ${reviewForm.decision === 'Onaylandı' ? 'onaylandı' : 'reddedildi'}.`);
       setReviewOpen(false);
       fetchLeaves();
     } catch (e) {
-      toast.error(e.response?.data || 'İşlem başarısız.');
+      toast.error(getErrMsg(e));
     } finally { setSaving(false); }
   };
 
@@ -90,7 +99,7 @@ export default function Leaves() {
       await leaveService.delete(deleteId);
       toast.success('Talep silindi.');
       fetchLeaves();
-    } catch { toast.error('Silinemedi.'); }
+    } catch (e) { toast.error(getErrMsg(e)); }
     finally { setDeleteOpen(false); setDeleteId(null); }
   };
 
@@ -152,7 +161,7 @@ export default function Leaves() {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', bgcolor: 'primary.light' }}>
-                        {l.userFullName[0]}
+                        {(l.userFullName || '?')[0]}
                       </Avatar>
                       <Box>
                         <Typography variant="body2" fontWeight={600}>{l.userFullName}</Typography>
