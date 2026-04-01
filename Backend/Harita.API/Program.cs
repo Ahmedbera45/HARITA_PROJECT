@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
+// Npgsql 6+: DateTime Kind=Unspecified hatasını önler (timestamp with time zone için gerekli)
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Veritabanı Bağlantısı
