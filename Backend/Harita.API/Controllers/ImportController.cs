@@ -1,3 +1,4 @@
+using Harita.API.DTOs;
 using Harita.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,9 +17,10 @@ namespace Harita.API.Controllers
             _importService = importService;
         }
 
-        /// <summary>Excel dosyasından parsel verisi içe aktar</summary>
+        /// <summary>Excel dosyasından parsel verisi içe aktar (Admin/Manager)</summary>
         [HttpPost("parcels")]
-        [RequestSizeLimit(10 * 1024 * 1024)] // 10 MB limit
+        [Authorize(Roles = "Admin,Manager")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
         public async Task<IActionResult> ImportParcels(IFormFile file)
         {
             try
@@ -46,6 +48,22 @@ namespace Harita.API.Controllers
         {
             var result = await _importService.GetParcelsAsync(batchId, mahalle);
             return Ok(result);
+        }
+
+        /// <summary>Parsel kaydını güncelle (Admin/Manager)</summary>
+        [HttpPut("parcels/{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> UpdateParcel(Guid id, [FromBody] UpdateParcelDto dto)
+        {
+            try
+            {
+                var result = await _importService.UpdateParcelAsync(id, dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

@@ -17,12 +17,59 @@ namespace Harita.API.Controllers
             _service = service;
         }
 
+        // ─── Harç Kalemleri ────────────────────────────────────────────────
+
         // GET api/feecalculation/rates
         [HttpGet("rates")]
-        public IActionResult GetRates()
+        public async Task<IActionResult> GetRates()
         {
-            return Ok(_service.GetFeeRates());
+            var result = await _service.GetFeeRatesAsync();
+            return Ok(result);
         }
+
+        // POST api/feecalculation/rates
+        [HttpPost("rates")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> CreateRate([FromBody] CreateFeeRateDto dto)
+        {
+            try
+            {
+                var result = await _service.CreateFeeRateAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // PUT api/feecalculation/rates/{id}
+        [HttpPut("rates/{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> UpdateRate(Guid id, [FromBody] UpdateFeeRateDto dto)
+        {
+            try
+            {
+                var result = await _service.UpdateFeeRateAsync(id, dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // DELETE api/feecalculation/rates/{id}
+        [HttpDelete("rates/{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> DeleteRate(Guid id)
+        {
+            var deleted = await _service.DeleteFeeRateAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+
+        // ─── Harç Hesaplama ────────────────────────────────────────────────
 
         // POST api/feecalculation
         [HttpPost]
@@ -58,6 +105,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/feecalculation/{id}
         [HttpDelete("{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var deleted = await _service.DeleteAsync(id);

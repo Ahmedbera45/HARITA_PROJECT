@@ -10,6 +10,7 @@ const importService = {
   },
   getLogs: () => api.get('/Import/logs').then(r => r.data),
   getParcels: (params = {}) => api.get('/Import/parcels', { params }).then(r => r.data),
+  updateParcel: (id, data) => api.put(`/Import/parcels/${id}`, data).then(r => r.data),
 };
 
 export default importService;

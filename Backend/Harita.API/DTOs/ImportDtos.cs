@@ -33,6 +33,20 @@ namespace Harita.API.DTOs
         public string? Nitelik { get; set; }
         public string? MalikAdi { get; set; }
         public string? PaftaNo { get; set; }
+        public decimal? RayicBedel { get; set; }
         public string? ImportBatchId { get; set; }
+    }
+
+    public class UpdateParcelDto
+    {
+        public required string Ada { get; set; }
+        public required string Parsel { get; set; }
+        public required string Mahalle { get; set; }
+        public string? Mevkii { get; set; }
+        public double? Alan { get; set; }
+        public string? Nitelik { get; set; }
+        public string? MalikAdi { get; set; }
+        public string? PaftaNo { get; set; }
+        public decimal? RayicBedel { get; set; }
     }
 }

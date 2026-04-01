@@ -8,5 +8,6 @@ namespace Harita.API.Services
         Task<ImportResultDto> ImportParcelsFromExcelAsync(IFormFile file);
         Task<List<ImportLogDto>> GetImportLogsAsync();
         Task<List<ParcelDto>> GetParcelsAsync(string? batchId = null, string? mahalle = null);
+        Task<ParcelDto> UpdateParcelAsync(Guid id, UpdateParcelDto dto);
     }
 }

@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace Harita.API.Entities
 {
     public class AppTask : BaseEntity
@@ -10,16 +8,10 @@ namespace Harita.API.Entities
         public string Priority { get; set; } = "Orta";
         public DateTime? DueDate { get; set; }
 
-        // --- YENİ EKLENEN ALANLAR ---
-        
-        // Görevi kime atadık? (Boşsa havuza düşmüş demektir)
-        public Guid? AssignedUserId { get; set; }
-        
-        // Veritabanı ilişkisi (User tablosuyla bağlantı)
-        [ForeignKey("AssignedUserId")]
-        public User? AssignedUser { get; set; }
-
-        // Görevi kim oluşturdu? (Şef mi, kendisi mi?)
+        // Görevi kim oluşturdu?
         public Guid CreatedByUserId { get; set; }
+
+        // Çoklu atama — TaskAssignment join tablosu üzerinden
+        public ICollection<TaskAssignment> Assignments { get; set; } = new List<TaskAssignment>();
     }
 }

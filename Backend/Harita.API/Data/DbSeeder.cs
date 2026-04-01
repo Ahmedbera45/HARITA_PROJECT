@@ -50,6 +50,22 @@ namespace Harita.API.Data
                     await context.SaveChangesAsync();
                 }
             }
+
+            // 3. Varsayılan harç kalemlerini seed et (yoksa ekle)
+            if (!await context.FeeRates.AnyAsync())
+            {
+                var defaultRates = new[]
+                {
+                    new FeeRate { RuhsatTuru = "Yapı Ruhsatı",           BirimHarc = 12.50, Aciklama = "m² başına yapı ruhsatı harcı",           IsActive = true, SiraNo = 1 },
+                    new FeeRate { RuhsatTuru = "İskan Ruhsatı",          BirimHarc = 8.75,  Aciklama = "m² başına iskan (yapı kullanma) harcı",   IsActive = true, SiraNo = 2 },
+                    new FeeRate { RuhsatTuru = "Tadilat Ruhsatı",        BirimHarc = 6.00,  Aciklama = "m² başına tadilat ruhsatı harcı",          IsActive = true, SiraNo = 3 },
+                    new FeeRate { RuhsatTuru = "Yıkım Ruhsatı",          BirimHarc = 4.50,  Aciklama = "m² başına yıkım ruhsatı harcı",            IsActive = true, SiraNo = 4 },
+                    new FeeRate { RuhsatTuru = "Kat İrtifakı",           BirimHarc = 3.25,  Aciklama = "m² başına kat irtifakı tesis harcı",       IsActive = true, SiraNo = 5 },
+                    new FeeRate { RuhsatTuru = "Reklam Tabelası Ruhsatı",BirimHarc = 15.00, Aciklama = "m² başına reklam tabelası ruhsatı harcı",  IsActive = true, SiraNo = 6 },
+                };
+                context.FeeRates.AddRange(defaultRates);
+                await context.SaveChangesAsync();
+            }
         }
     }
 }

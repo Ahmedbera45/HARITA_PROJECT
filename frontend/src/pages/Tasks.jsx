@@ -3,7 +3,8 @@ import {
   Box, Paper, Typography, Button, Grid, Card, CardContent,
   Chip, IconButton, Dialog, DialogTitle, DialogContent,
   TextField, DialogActions, MenuItem, Tooltip, DialogContentText,
-  Stack, FormControl, InputLabel, Select
+  Stack, FormControl, InputLabel, Select, OutlinedInput, Checkbox,
+  ListItemText, AvatarGroup, Avatar
 } from '@mui/material';
 import {
   Add, Delete, Edit, ArrowForward, ArrowBack,
@@ -34,6 +35,11 @@ const formatDate = (dateString) => {
 
 const PRIORITY_COLORS = { Düşük: 'success', Orta: 'warning', Yüksek: 'error' };
 
+const EMPTY_FORM = {
+  title: '', description: '', priority: 'Orta', status: 'Bekliyor',
+  dueDate: '', assignedUserIds: []
+};
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -47,10 +53,7 @@ export default function Tasks() {
   const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const [formData, setFormData] = useState({
-    title: '', description: '', priority: 'Orta', status: 'Bekliyor',
-    dueDate: '', assignedUserId: ''
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   // Silme dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -59,7 +62,7 @@ export default function Tasks() {
   // Hızlı atama dialog (yönetici)
   const [assignDialog, setAssignDialog] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
-  const [assignUserId, setAssignUserId] = useState('');
+  const [assignUserIds, setAssignUserIds] = useState([]);
 
   const { isManager } = useAuth();
 
@@ -90,7 +93,7 @@ export default function Tasks() {
   };
 
   const handleOpenCreate = () => {
-    setFormData({ title: '', description: '', priority: 'Orta', status: 'Bekliyor', dueDate: '', assignedUserId: '' });
+    setFormData(EMPTY_FORM);
     setIsEdit(false);
     setOpenDialog(true);
   };
@@ -102,12 +105,21 @@ export default function Tasks() {
       priority: task.priority,
       status: task.status,
       dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-      assignedUserId: task.assignedUserId || ''
+      assignedUserIds: task.assignedUsers?.map(u => u.id) ?? []
     });
     setSelectedId(task.id);
     setIsEdit(true);
     setOpenDialog(true);
   };
+
+  const buildPayload = (fd) => ({
+    title: fd.title,
+    description: fd.description || '',
+    status: fd.status,
+    priority: fd.priority,
+    dueDate: fd.dueDate || null,
+    assignedUserIds: fd.assignedUserIds ?? []
+  });
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -116,22 +128,17 @@ export default function Tasks() {
     }
     setSaving(true);
     try {
-      const dataToSend = {
-        ...formData,
-        dueDate: formData.dueDate || null,
-        assignedUserId: formData.assignedUserId || null
-      };
       if (isEdit) {
-        await taskService.update(selectedId, dataToSend);
+        await taskService.update(selectedId, buildPayload(formData));
         toast.success('Görev güncellendi.');
       } else {
-        await taskService.create(dataToSend);
+        await taskService.create(buildPayload(formData));
         toast.success('Görev oluşturuldu.');
       }
       setOpenDialog(false);
       fetchTasks();
     } catch (e) {
-      toast.error(e.response?.data || 'İşlem başarısız.');
+      toast.error(e.response?.data?.message || e.response?.data || 'İşlem başarısız.');
     } finally {
       setSaving(false);
     }
@@ -148,7 +155,7 @@ export default function Tasks() {
       toast.success('Görev silindi.');
       fetchTasks();
     } catch (e) {
-      toast.error(e.response?.data || 'Silinemedi.');
+      toast.error(e.response?.data?.message || 'Silinemedi.');
     } finally {
       setDeleteDialogOpen(false);
       setDeleteTargetId(null);
@@ -172,19 +179,18 @@ export default function Tasks() {
           status: newStatus,
           priority: task.priority,
           dueDate: task.dueDate ? task.dueDate.split('T')[0] : null,
-          assignedUserId: task.assignedUserId || null
+          assignedUserIds: task.assignedUsers?.map(u => u.id) ?? []
         });
       } catch (e) {
-        toast.error(e.response?.data || 'Durum güncellenemedi.');
+        toast.error(e.response?.data?.message || 'Durum güncellenemedi.');
         fetchTasks();
       }
     }
   };
 
-  // Yönetici: havuzdan hızlı atama
   const handleOpenAssign = (task) => {
     setAssignTarget(task);
-    setAssignUserId(task.assignedUserId || '');
+    setAssignUserIds(task.assignedUsers?.map(u => u.id) ?? []);
     setAssignDialog(true);
   };
 
@@ -197,19 +203,19 @@ export default function Tasks() {
         status: assignTarget.status,
         priority: assignTarget.priority,
         dueDate: assignTarget.dueDate ? assignTarget.dueDate.split('T')[0] : null,
-        assignedUserId: assignUserId || null
+        assignedUserIds: assignUserIds
       });
-      toast.success(assignUserId ? 'Görev atandı.' : 'Atama kaldırıldı.');
+      toast.success(assignUserIds.length > 0 ? 'Görev atandı.' : 'Atama kaldırıldı.');
       setAssignDialog(false);
       fetchTasks();
     } catch (e) {
-      toast.error(e.response?.data || 'Atama başarısız.');
+      toast.error(e.response?.data?.message || 'Atama başarısız.');
     } finally {
       setSaving(false);
     }
   };
 
-  const unassignedTasks = tasks.filter(t => !t.assignedUserId);
+  const unassignedTasks = tasks.filter(t => !t.assignedUsers || t.assignedUsers.length === 0);
   const filteredTasks = (statusKey) => tasks.filter(t => t.status === statusKey);
 
   // Görev Kartı Sütunu
@@ -251,20 +257,20 @@ export default function Tasks() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, pt: 1, borderTop: '1px solid #eee' }}>
-                  <Tooltip title={task.assignedUserName || 'Atanmamış'}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{
-                        width: 24, height: 24, borderRadius: '50%',
-                        bgcolor: stringToColor(task.assignedUserName || 'X'),
-                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem'
-                      }}>
-                        {(task.assignedUserName || 'A')[0]}
-                      </Box>
-                      <Typography variant="caption" sx={{ maxWidth: 80, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {task.assignedUserName?.split(' ')[0]}
-                      </Typography>
-                    </Box>
-                  </Tooltip>
+                  {/* Atanan kullanıcı avatarları */}
+                  {task.assignedUsers && task.assignedUsers.length > 0 ? (
+                    <Tooltip title={task.assignedUsers.map(u => u.fullName).join(', ')}>
+                      <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: '0.65rem' } }}>
+                        {task.assignedUsers.map(u => (
+                          <Avatar key={u.id} sx={{ bgcolor: stringToColor(u.fullName), width: 24, height: 24, fontSize: '0.65rem' }}>
+                            {(u.fullName || '?')[0]}
+                          </Avatar>
+                        ))}
+                      </AvatarGroup>
+                    </Tooltip>
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">Atanmamış</Typography>
+                  )}
 
                   <Box>
                     {statusKey !== 'Bekliyor' && (
@@ -274,7 +280,6 @@ export default function Tasks() {
                     {statusKey !== 'Bitti' && (
                       <IconButton size="small" color="success" onClick={() => moveTask(task, 'next')}><ArrowForward fontSize="small" /></IconButton>
                     )}
-                    {/* Yönetici tüm kartları silebilir; staff sadece "Bitti" sütunundakileri */}
                     {(isManager || statusKey === 'Bitti') && (
                       <IconButton size="small" color="error" onClick={() => handleDeleteClick(task.id)}><Delete fontSize="small" /></IconButton>
                     )}
@@ -428,28 +433,37 @@ export default function Tasks() {
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
               />
             </Grid>
-            {/* Yönetici ise kullanıcı atama dropdown göster */}
+            {/* Yönetici ise çoklu kullanıcı atama */}
             {isManager && (
               <Grid size={{ xs: 12 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Atanan Kişi</InputLabel>
+                  <InputLabel>Atanan Kişiler</InputLabel>
                   <Select
-                    value={formData.assignedUserId || ''}
-                    label="Atanan Kişi"
-                    onChange={(e) => setFormData({ ...formData, assignedUserId: e.target.value })}
+                    multiple
+                    value={formData.assignedUserIds}
+                    onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
+                    input={<OutlinedInput label="Atanan Kişiler" />}
+                    renderValue={(selected) =>
+                      users
+                        .filter(u => selected.includes(u.id))
+                        .map(u => u.fullName)
+                        .join(', ') || '— Seçilmedi —'
+                    }
                   >
-                    <MenuItem value="">— Atanmamış (Havuza Ekle) —</MenuItem>
                     {users.map(u => (
-                      <MenuItem key={u.id} value={u.id}>{u.fullName} ({u.department})</MenuItem>
+                      <MenuItem key={u.id} value={u.id}>
+                        <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
+                        <ListItemText primary={u.fullName} secondary={u.department} />
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </Grid>
             )}
-            {!isManager && (
+            {!isManager && !isEdit && (
               <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" color="text.secondary">
-                  * Görev havuzuna eklenecek, yönetici tarafından atanabilir.
+                  * Görev oluşturulunca otomatik olarak size atanacaktır.
                 </Typography>
               </Grid>
             )}
@@ -479,15 +493,24 @@ export default function Tasks() {
                 </Box>
               </Paper>
               <FormControl fullWidth>
-                <InputLabel>Atanan Kişi</InputLabel>
+                <InputLabel>Atanan Kişiler</InputLabel>
                 <Select
-                  value={assignUserId}
-                  label="Atanan Kişi"
-                  onChange={e => setAssignUserId(e.target.value)}
+                  multiple
+                  value={assignUserIds}
+                  onChange={e => setAssignUserIds(e.target.value)}
+                  input={<OutlinedInput label="Atanan Kişiler" />}
+                  renderValue={(selected) =>
+                    users
+                      .filter(u => selected.includes(u.id))
+                      .map(u => u.fullName)
+                      .join(', ') || '— Seçilmedi —'
+                  }
                 >
-                  <MenuItem value="">— Atanmamış —</MenuItem>
                   {users.map(u => (
-                    <MenuItem key={u.id} value={u.id}>{u.fullName} ({u.department})</MenuItem>
+                    <MenuItem key={u.id} value={u.id}>
+                      <Checkbox checked={assignUserIds.includes(u.id)} />
+                      <ListItemText primary={u.fullName} secondary={u.department} />
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>

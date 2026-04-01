@@ -26,19 +26,41 @@ namespace Harita.API.Services
 
         private bool IsManager()
         {
-            var roleClaim = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role);
-            return roleClaim?.Value == "Manager" || roleClaim?.Value == "Admin";
+            var role = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+            return role == "Manager" || role == "Admin";
         }
+
+        private static TaskDto MapToDto(AppTask t) => new()
+        {
+            Id          = t.Id,
+            Title       = t.Title,
+            Description = t.Description,
+            Status      = t.Status,
+            Priority    = t.Priority,
+            DueDate     = t.DueDate,
+            CreatedAt   = t.CreatedAt,
+            AssignedUsers = t.Assignments?.Select(a => new AssignedUserDto
+            {
+                Id         = a.User.Id,
+                FullName   = $"{a.User.Name} {a.User.Surname}",
+                Department = a.User.Department
+            }).ToList() ?? new()
+        };
 
         public async Task<List<TaskDto>> GetAllAsync(string? status = null, string? priority = null)
         {
             var currentUserId = GetCurrentUserId();
             var isManager = IsManager();
 
-            var query = _context.Tasks.AsQueryable();
+            var query = _context.Tasks
+                .Include(t => t.Assignments).ThenInclude(a => a.User)
+                .AsQueryable();
 
+            // Manager/Admin: tüm görevleri görür. Staff: sadece kendine atanan veya kendisinin oluşturduğu
             if (!isManager)
-                query = query.Where(t => t.AssignedUserId == currentUserId || t.CreatedByUserId == currentUserId);
+                query = query.Where(t =>
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(t => t.Status == status);
@@ -46,131 +68,73 @@ namespace Harita.API.Services
             if (!string.IsNullOrWhiteSpace(priority))
                 query = query.Where(t => t.Priority == priority);
 
-            return await query
-                .Include(t => t.AssignedUser)
-                .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new TaskDto
-                {
-                    Id = t.Id,
-                    Title = t.Title,
-                    Description = t.Description,
-                    Status = t.Status,
-                    Priority = t.Priority,
-                    DueDate = t.DueDate,
-                    CreatedAt = t.CreatedAt,
-                    AssignedUserId = t.AssignedUserId,
-                    AssignedUserName = t.AssignedUser != null
-                        ? t.AssignedUser.Name + " " + t.AssignedUser.Surname
-                        : "Atanmamış"
-                })
-                .ToListAsync();
+            var tasks = await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
+            return tasks.Select(MapToDto).ToList();
         }
 
         public async Task<TaskDto?> GetByIdAsync(Guid id)
         {
             var t = await _context.Tasks
-                .Include(t => t.AssignedUser)
+                .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .FirstOrDefaultAsync(t => t.Id == id);
 
-            if (t == null) return null;
-
-            return new TaskDto
-            {
-                Id = t.Id,
-                Title = t.Title,
-                Description = t.Description,
-                Status = t.Status,
-                Priority = t.Priority,
-                DueDate = t.DueDate,
-                CreatedAt = t.CreatedAt,
-                AssignedUserId = t.AssignedUserId,
-                AssignedUserName = t.AssignedUser != null
-                    ? t.AssignedUser.Name + " " + t.AssignedUser.Surname
-                    : "Atanmamış"
-            };
+            return t == null ? null : MapToDto(t);
         }
 
         public async Task<TaskDto> CreateAsync(CreateTaskDto dto)
         {
             var currentUserId = GetCurrentUserId();
+            var isManager = IsManager();
 
             var task = new AppTask
             {
-                Title = dto.Title,
-                Description = dto.Description,
-                Status = dto.Status,
-                Priority = dto.Priority,
-                DueDate = dto.DueDate,
-                CreatedByUserId = currentUserId,
-                AssignedUserId = dto.AssignedUserId
+                Title             = dto.Title,
+                Description       = dto.Description,
+                Status            = dto.Status,
+                Priority          = dto.Priority,
+                DueDate           = dto.DueDate,
+                CreatedByUserId   = currentUserId
             };
 
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
 
-            string? assignedUserName = null;
-            if (task.AssignedUserId.HasValue)
-            {
-                var assignedUser = await _context.Users.FindAsync(task.AssignedUserId.Value);
-                if (assignedUser != null)
-                    assignedUserName = $"{assignedUser.Name} {assignedUser.Surname}";
-            }
+            // Atama listesini belirle:
+            // Manager/Admin → DTO'daki listeyi kullan (boşsa atanmamış bırak)
+            // Staff → kendi görevini kendine ata (havuza atmasın)
+            var assignIds = isManager
+                ? dto.AssignedUserIds
+                : new List<Guid> { currentUserId };
 
-            return new TaskDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                Description = task.Description,
-                Status = task.Status,
-                Priority = task.Priority,
-                DueDate = task.DueDate,
-                CreatedAt = task.CreatedAt,
-                AssignedUserId = task.AssignedUserId,
-                AssignedUserName = assignedUserName ?? "Atanmamış"
-            };
+            await SetAssignmentsAsync(task.Id, assignIds);
+
+            return await GetByIdAsync(task.Id) ?? MapToDto(task);
         }
 
         public async Task<TaskDto> UpdateAsync(Guid id, UpdateTaskDto dto)
         {
-            var task = await _context.Tasks.FindAsync(id);
-            if (task == null) throw new Exception("Görev bulunamadı");
+            var task = await _context.Tasks.FindAsync(id)
+                ?? throw new Exception("Görev bulunamadı.");
 
-            task.Title = dto.Title;
+            task.Title       = dto.Title;
             task.Description = dto.Description;
-            task.Status = dto.Status;
-            task.Priority = dto.Priority;
-            task.DueDate = dto.DueDate;
-            task.AssignedUserId = dto.AssignedUserId; // null = atamayı kaldır
+            task.Status      = dto.Status;
+            task.Priority    = dto.Priority;
+            task.DueDate     = dto.DueDate;
 
             await _context.SaveChangesAsync();
 
-            string? assignedUserName = null;
-            if (task.AssignedUserId.HasValue)
-            {
-                var assignedUser = await _context.Users.FindAsync(task.AssignedUserId.Value);
-                if (assignedUser != null)
-                    assignedUserName = $"{assignedUser.Name} {assignedUser.Surname}";
-            }
+            // Manager/Admin atama listesini değiştirebilir
+            if (IsManager())
+                await SetAssignmentsAsync(id, dto.AssignedUserIds);
 
-            return new TaskDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                Description = task.Description,
-                Status = task.Status,
-                Priority = task.Priority,
-                DueDate = task.DueDate,
-                CreatedAt = task.CreatedAt,
-                AssignedUserId = task.AssignedUserId,
-                AssignedUserName = assignedUserName ?? "Atanmamış"
-            };
+            return await GetByIdAsync(id) ?? MapToDto(task);
         }
 
         public async Task<bool> DeleteAsync(Guid id)
         {
             var task = await _context.Tasks.FindAsync(id);
             if (task == null) return false;
-
             _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
             return true;
@@ -183,16 +147,30 @@ namespace Harita.API.Services
 
             var query = _context.Tasks.AsQueryable();
             if (!isManager)
-                query = query.Where(t => t.AssignedUserId == currentUserId || t.CreatedByUserId == currentUserId);
+                query = query.Where(t =>
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
 
             var tasks = await query.ToListAsync();
             return new TaskSummaryDto
             {
-                Pending = tasks.Count(t => t.Status == "Bekliyor"),
+                Pending    = tasks.Count(t => t.Status == "Bekliyor"),
                 InProgress = tasks.Count(t => t.Status == "İşlemde"),
-                Done = tasks.Count(t => t.Status == "Bitti"),
-                Total = tasks.Count
+                Done       = tasks.Count(t => t.Status == "Bitti"),
+                Total      = tasks.Count
             };
+        }
+
+        // Görevin atamalarını toptan güncelle (mevcut sil + yeni ekle)
+        private async Task SetAssignmentsAsync(Guid taskId, List<Guid> userIds)
+        {
+            var existing = _context.TaskAssignments.Where(a => a.TaskId == taskId);
+            _context.TaskAssignments.RemoveRange(existing);
+
+            foreach (var uid in userIds.Distinct())
+                _context.TaskAssignments.Add(new TaskAssignment { TaskId = taskId, UserId = uid });
+
+            await _context.SaveChangesAsync();
         }
     }
 }

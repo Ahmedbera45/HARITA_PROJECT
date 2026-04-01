@@ -3,13 +3,18 @@ import {
   Box, Typography, Paper, Grid, TextField, MenuItem, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
-  Alert, Chip, Divider, IconButton, Tooltip,
+  Alert, Chip, Divider, IconButton, Tooltip, Switch, FormControlLabel,
+  Stack,
 } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PrintIcon from '@mui/icons-material/Print';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
+import SettingsIcon from '@mui/icons-material/Settings';
 import feeService from '../services/feeService';
+import { useAuth } from '../hooks/useAuth';
 
 const formatCurrency = (val) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
@@ -17,7 +22,11 @@ const formatCurrency = (val) =>
 const formatDate = (d) =>
   new Date(d).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
+const EMPTY_RATE_FORM = { ruhsatTuru: '', birimHarc: '', aciklama: '', siraNo: 0, isActive: true };
+
 export default function FeeCalculation() {
+  const { isManager } = useAuth();
+
   const [rates, setRates] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -29,29 +38,42 @@ export default function FeeCalculation() {
     ruhsatTuru: '', alanM2: '', ada: '', parsel: '', mahalle: '', malikAdi: '', notlar: '',
   });
 
-  const [preview, setPreview] = useState(null); // calculated result before save
+  const [preview, setPreview] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedCalc, setSelectedCalc] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
+  // Harç kalemi yönetimi
+  const [rateDialogOpen, setRateDialogOpen] = useState(false);
+  const [rateEditId, setRateEditId] = useState(null);
+  const [rateForm, setRateForm] = useState(EMPTY_RATE_FORM);
+  const [rateSaving, setRateSaving] = useState(false);
+  const [rateError, setRateError] = useState('');
+  const [rateDeleteDialog, setRateDeleteDialog] = useState({ open: false, id: null });
+
   const printRef = useRef();
 
   useEffect(() => {
-    feeService.getRates()
-      .then(r => setRates(r.data))
-      .catch(() => {});
+    loadRates();
     loadHistory();
   }, []);
+
+  const loadRates = () => {
+    feeService.getRates()
+      .then(setRates)
+      .catch(() => {});
+  };
 
   const loadHistory = () => {
     setHistLoading(true);
     feeService.getAll()
-      .then(r => setHistory(r.data))
+      .then(setHistory)
       .catch(() => {})
       .finally(() => setHistLoading(false));
   };
 
-  const selectedRate = rates.find(r => r.ruhsatTuru === form.ruhsatTuru);
+  const activeRates = rates.filter(r => r.isActive);
+  const selectedRate = activeRates.find(r => r.ruhsatTuru === form.ruhsatTuru);
   const previewAmount =
     selectedRate && parseFloat(form.alanM2) > 0
       ? Math.round(parseFloat(form.alanM2) * selectedRate.birimHarc * 100) / 100
@@ -66,7 +88,7 @@ export default function FeeCalculation() {
     }
     setLoading(true);
     try {
-      const { data } = await feeService.calculate({
+      const data = await feeService.calculate({
         ruhsatTuru: form.ruhsatTuru,
         alanM2: parseFloat(form.alanM2),
         ada: form.ada,
@@ -106,6 +128,66 @@ export default function FeeCalculation() {
     setDetailOpen(true);
   };
 
+  // ── Harç Kalemi Yönetimi ──────────────────────────────────────────
+  const openCreateRate = () => {
+    setRateEditId(null);
+    setRateForm(EMPTY_RATE_FORM);
+    setRateError('');
+    setRateDialogOpen(true);
+  };
+
+  const openEditRate = (rate) => {
+    setRateEditId(rate.id);
+    setRateForm({
+      ruhsatTuru: rate.ruhsatTuru,
+      birimHarc: rate.birimHarc,
+      aciklama: rate.aciklama || '',
+      siraNo: rate.siraNo,
+      isActive: rate.isActive,
+    });
+    setRateError('');
+    setRateDialogOpen(true);
+  };
+
+  const handleSaveRate = async () => {
+    if (!rateForm.ruhsatTuru.trim() || !rateForm.birimHarc) {
+      setRateError('Ruhsat Türü ve Birim Harç zorunludur.');
+      return;
+    }
+    setRateSaving(true);
+    setRateError('');
+    try {
+      const payload = {
+        ruhsatTuru: rateForm.ruhsatTuru,
+        birimHarc: parseFloat(rateForm.birimHarc),
+        aciklama: rateForm.aciklama || null,
+        siraNo: parseInt(rateForm.siraNo) || 0,
+        isActive: rateForm.isActive,
+      };
+      if (rateEditId) {
+        await feeService.updateRate(rateEditId, payload);
+      } else {
+        await feeService.createRate(payload);
+      }
+      setRateDialogOpen(false);
+      loadRates();
+    } catch (e) {
+      setRateError(e.response?.data?.message || 'İşlem başarısız.');
+    } finally {
+      setRateSaving(false);
+    }
+  };
+
+  const handleDeleteRate = async () => {
+    try {
+      await feeService.deleteRate(rateDeleteDialog.id);
+      setRateDeleteDialog({ open: false, id: null });
+      loadRates();
+    } catch {
+      setError('Harç kalemi silinemedi.');
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={3}>
@@ -126,8 +208,8 @@ export default function FeeCalculation() {
               onChange={e => setForm(p => ({ ...p, ruhsatTuru: e.target.value }))}
               sx={{ mb: 2 }}
             >
-              {rates.map(r => (
-                <MenuItem key={r.ruhsatTuru} value={r.ruhsatTuru}>
+              {activeRates.map(r => (
+                <MenuItem key={r.id} value={r.ruhsatTuru}>
                   <Box>
                     <Typography variant="body2">{r.ruhsatTuru}</Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -167,7 +249,6 @@ export default function FeeCalculation() {
               onChange={e => setForm(p => ({ ...p, notlar: e.target.value }))}
               sx={{ mb: 2 }} />
 
-            {/* Anlık Önizleme */}
             {previewAmount !== null && (
               <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'primary.50' }}>
                 <Typography variant="caption" color="text.secondary">Tahmini Harç Tutarı</Typography>
@@ -189,17 +270,76 @@ export default function FeeCalculation() {
             </Button>
           </Paper>
 
-          {/* Harç Tarifeleri */}
+          {/* Harç Tarifeleri Paneli */}
           <Paper sx={{ p: 3, mt: 2 }}>
-            <Typography variant="subtitle2" mb={1} color="text.secondary">
-              2024 Yılı Harç Tarifesi
-            </Typography>
-            {rates.map(r => (
-              <Box key={r.ruhsatTuru} display="flex" justifyContent="space-between" py={0.5}>
-                <Typography variant="body2">{r.ruhsatTuru}</Typography>
-                <Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" />
-              </Box>
-            ))}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Harç Tarifesi
+              </Typography>
+              {isManager && (
+                <Button
+                  size="small"
+                  startIcon={<SettingsIcon />}
+                  onClick={openCreateRate}
+                  variant="outlined"
+                >
+                  Yeni Kalem
+                </Button>
+              )}
+            </Box>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Ruhsat Türü</TableCell>
+                    <TableCell align="right">TL/m²</TableCell>
+                    {isManager && <TableCell align="center">Durum</TableCell>}
+                    {isManager && <TableCell align="center">İşlem</TableCell>}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rates.map(r => (
+                    <TableRow key={r.id} hover sx={{ opacity: r.isActive ? 1 : 0.5 }}>
+                      <TableCell>
+                        <Typography variant="body2">{r.ruhsatTuru}</Typography>
+                        {r.aciklama && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {r.aciklama}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" />
+                      </TableCell>
+                      {isManager && (
+                        <TableCell align="center">
+                          <Chip
+                            label={r.isActive ? 'Aktif' : 'Pasif'}
+                            size="small"
+                            color={r.isActive ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                      )}
+                      {isManager && (
+                        <TableCell align="center">
+                          <Tooltip title="Düzenle">
+                            <IconButton size="small" color="primary" onClick={() => openEditRate(r)}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Sil">
+                            <IconButton size="small" color="error"
+                              onClick={() => setRateDeleteDialog({ open: true, id: r.id })}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
         </Grid>
 
@@ -224,6 +364,7 @@ export default function FeeCalculation() {
                       <TableCell>Ada/Parsel</TableCell>
                       <TableCell align="right">Alan</TableCell>
                       <TableCell align="right">Tutar</TableCell>
+                      <TableCell>Hesaplayan</TableCell>
                       <TableCell>Tarih</TableCell>
                       <TableCell align="center">İşlem</TableCell>
                     </TableRow>
@@ -243,6 +384,9 @@ export default function FeeCalculation() {
                           </Typography>
                         </TableCell>
                         <TableCell>
+                          <Typography variant="caption">{h.hesaplayanKullanici || '—'}</Typography>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="caption">{formatDate(h.hesaplamaTarihi)}</Typography>
                         </TableCell>
                         <TableCell align="center">
@@ -256,12 +400,14 @@ export default function FeeCalculation() {
                               <PrintIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Sil">
-                            <IconButton size="small" color="error"
-                              onClick={() => setDeleteDialog({ open: true, id: h.id })}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {isManager && (
+                            <Tooltip title="Sil">
+                              <IconButton size="small" color="error"
+                                onClick={() => setDeleteDialog({ open: true, id: h.id })}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -272,6 +418,71 @@ export default function FeeCalculation() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* ── Harç Kalemi Oluştur / Düzenle Dialog ── */}
+      <Dialog open={rateDialogOpen} onClose={() => setRateDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {rateEditId ? <EditIcon /> : <AddIcon />}
+          {rateEditId ? 'Harç Kalemi Düzenle' : 'Yeni Harç Kalemi'}
+        </DialogTitle>
+        <DialogContent dividers>
+          {rateError && <Alert severity="error" sx={{ mb: 2 }}>{rateError}</Alert>}
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField
+              label="Ruhsat Türü" required fullWidth
+              value={rateForm.ruhsatTuru}
+              onChange={e => setRateForm(p => ({ ...p, ruhsatTuru: e.target.value }))}
+            />
+            <TextField
+              label="Birim Harç (TL/m²)" required fullWidth type="number"
+              inputProps={{ step: '0.01', min: '0' }}
+              value={rateForm.birimHarc}
+              onChange={e => setRateForm(p => ({ ...p, birimHarc: e.target.value }))}
+            />
+            <TextField
+              label="Açıklama (opsiyonel)" fullWidth
+              value={rateForm.aciklama}
+              onChange={e => setRateForm(p => ({ ...p, aciklama: e.target.value }))}
+            />
+            <TextField
+              label="Sıra No" fullWidth type="number"
+              inputProps={{ min: '0' }}
+              value={rateForm.siraNo}
+              onChange={e => setRateForm(p => ({ ...p, siraNo: e.target.value }))}
+            />
+            {rateEditId && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={rateForm.isActive}
+                    onChange={e => setRateForm(p => ({ ...p, isActive: e.target.checked }))}
+                    color="success"
+                  />
+                }
+                label={rateForm.isActive ? 'Aktif' : 'Pasif'}
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRateDialogOpen(false)}>İptal</Button>
+          <Button onClick={handleSaveRate} variant="contained" disabled={rateSaving}>
+            {rateSaving ? 'Kaydediliyor...' : 'Kaydet'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Harç Kalemi Silme Onay ── */}
+      <Dialog open={rateDeleteDialog.open} onClose={() => setRateDeleteDialog({ open: false, id: null })}>
+        <DialogTitle>Harç Kalemini Sil</DialogTitle>
+        <DialogContent>
+          <Typography>Bu harç kalemini silmek istediğinizden emin misiniz?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRateDeleteDialog({ open: false, id: null })}>İptal</Button>
+          <Button color="error" variant="contained" onClick={handleDeleteRate}>Sil</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Detay Dialog ── */}
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="sm" fullWidth>
@@ -286,7 +497,7 @@ export default function FeeCalculation() {
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">Hesaplayan</Typography>
-                  <Typography>{selectedCalc.hesaplayanKullanici}</Typography>
+                  <Typography>{selectedCalc.hesaplayanKullanici || '—'}</Typography>
                 </Grid>
                 <Grid item xs={4}>
                   <Typography variant="caption" color="text.secondary">Ada</Typography>
@@ -340,7 +551,7 @@ export default function FeeCalculation() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Silme Onay Dialog ── */}
+      {/* ── Hesaplama Silme Onay Dialog ── */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, id: null })}>
         <DialogTitle>Kaydı Sil</DialogTitle>
         <DialogContent>
@@ -352,12 +563,9 @@ export default function FeeCalculation() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Yazdırma Alanı (print:block) ── */}
+      {/* ── Yazdırma Alanı ── */}
       {selectedCalc && (
-        <Box
-          ref={printRef}
-          sx={{ display: 'none', '@media print': { display: 'block' } }}
-        >
+        <Box ref={printRef} sx={{ display: 'none', '@media print': { display: 'block' } }}>
           <Box sx={{ p: 4, fontFamily: 'serif' }}>
             <Typography variant="h5" align="center" gutterBottom>
               ÇAYIROVA BELEDİYESİ
@@ -381,7 +589,7 @@ export default function FeeCalculation() {
             </Grid>
             <Divider sx={{ my: 2 }} />
             <Typography variant="caption">
-              Hesaplayan: {selectedCalc.hesaplayanKullanici} &nbsp;|&nbsp;
+              Hesaplayan: {selectedCalc.hesaplayanKullanici || '—'} &nbsp;|&nbsp;
               Tarih: {formatDate(selectedCalc.hesaplamaTarihi)}
             </Typography>
           </Box>

@@ -97,6 +97,15 @@ namespace Harita.API.Services
                         alan = parsed;
                 }
 
+                decimal? rayicBedel = null;
+                var rayicIdx = GetColIdx("RayicBedel");
+                if (rayicIdx > 0)
+                {
+                    var rayicVal = r.Cell(rayicIdx).GetString().Trim().Replace(',', '.');
+                    if (!string.IsNullOrEmpty(rayicVal) && decimal.TryParse(rayicVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedRayic))
+                        rayicBedel = parsedRayic;
+                }
+
                 parcels.Add(new Parcel
                 {
                     Ada           = ada,
@@ -107,6 +116,7 @@ namespace Harita.API.Services
                     Nitelik       = GetColIdx("Nitelik") > 0 ? r.Cell(GetColIdx("Nitelik")).GetString().Trim() : null,
                     MalikAdi      = GetColIdx("MalikAdi") > 0 ? r.Cell(GetColIdx("MalikAdi")).GetString().Trim() : null,
                     PaftaNo       = GetColIdx("PaftaNo") > 0 ? r.Cell(GetColIdx("PaftaNo")).GetString().Trim() : null,
+                    RayicBedel    = rayicBedel,
                     ImportBatchId = batchId
                 });
             }
@@ -182,9 +192,43 @@ namespace Harita.API.Services
                     Nitelik       = p.Nitelik,
                     MalikAdi      = p.MalikAdi,
                     PaftaNo       = p.PaftaNo,
+                    RayicBedel    = p.RayicBedel,
                     ImportBatchId = p.ImportBatchId
                 })
                 .ToListAsync();
+        }
+
+        public async Task<ParcelDto> UpdateParcelAsync(Guid id, UpdateParcelDto dto)
+        {
+            var parcel = await _context.Parcels.FindAsync(id)
+                ?? throw new Exception("Parsel bulunamadı.");
+
+            parcel.Ada        = dto.Ada;
+            parcel.Parsel     = dto.Parsel;
+            parcel.Mahalle    = dto.Mahalle;
+            parcel.Mevkii     = dto.Mevkii;
+            parcel.Alan       = dto.Alan;
+            parcel.Nitelik    = dto.Nitelik;
+            parcel.MalikAdi   = dto.MalikAdi;
+            parcel.PaftaNo    = dto.PaftaNo;
+            parcel.RayicBedel = dto.RayicBedel;
+
+            await _context.SaveChangesAsync();
+
+            return new ParcelDto
+            {
+                Id            = parcel.Id,
+                Ada           = parcel.Ada,
+                Parsel        = parcel.Parsel,
+                Mahalle       = parcel.Mahalle,
+                Mevkii        = parcel.Mevkii,
+                Alan          = parcel.Alan,
+                Nitelik       = parcel.Nitelik,
+                MalikAdi      = parcel.MalikAdi,
+                PaftaNo       = parcel.PaftaNo,
+                RayicBedel    = parcel.RayicBedel,
+                ImportBatchId = parcel.ImportBatchId
+            };
         }
     }
 }

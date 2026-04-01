@@ -2,18 +2,29 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Alert, LinearProgress,
-  TextField, InputAdornment, Stack, Divider, Tabs, Tab, Tooltip
+  TextField, InputAdornment, Stack, Tabs, Tab, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
 } from '@mui/material';
 import {
   CloudUpload, History, Search, CheckCircle, Error as ErrorIcon,
-  TableChart, FileDownload
+  TableChart, FileDownload, Edit as EditIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import importService from '../services/importService';
+import { useAuth } from '../hooks/useAuth';
 
 const fmt = (d) => d ? new Date(d).toLocaleString('tr-TR') : '-';
+const fmtCurrency = (val) =>
+  val != null
+    ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val)
+    : '-';
+
+const EMPTY_PARCEL_FORM = {
+  ada: '', parsel: '', mahalle: '', mevkii: '', alan: '', nitelik: '', malikAdi: '', paftaNo: '', rayicBedel: '',
+};
 
 export default function Import() {
+  const { isManager } = useAuth();
   const [tab, setTab] = useState(0);
 
   // Upload state
@@ -31,6 +42,13 @@ export default function Import() {
   const [loadingParcels, setLoadingParcels] = useState(false);
   const [mahalleFilter, setMahalleFilter] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
+
+  // Parcel edit dialog
+  const [editDialog, setEditDialog] = useState(false);
+  const [editParcelId, setEditParcelId] = useState(null);
+  const [editForm, setEditForm] = useState(EMPTY_PARCEL_FORM);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     if (tab === 1) fetchLogs();
@@ -87,14 +105,63 @@ export default function Import() {
     });
   };
 
-  // Şablon Excel indirme (tarayıcıda oluştur)
   const downloadTemplate = () => {
-    const csv = 'Ada,Parsel,Mahalle,Mevkii,Alan,Nitelik,MalikAdi,PaftaNo\n100,1,Merkez,Aşağı Mahalle,500,Arsa,Ali Veli,10-B\n';
+    const csv = 'Ada,Parsel,Mahalle,Mevkii,Alan,Nitelik,MalikAdi,PaftaNo,RayicBedel\n100,1,Merkez,Aşağı Mahalle,500,Arsa,Ali Veli,10-B,250000\n';
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'parsel_sablonu.csv'; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ── Parsel düzenleme ──────────────────────────────────────────────
+  const openEditParcel = (p) => {
+    setEditParcelId(p.id);
+    setEditForm({
+      ada: p.ada,
+      parsel: p.parsel,
+      mahalle: p.mahalle,
+      mevkii: p.mevkii || '',
+      alan: p.alan != null ? p.alan : '',
+      nitelik: p.nitelik || '',
+      malikAdi: p.malikAdi || '',
+      paftaNo: p.paftaNo || '',
+      rayicBedel: p.rayicBedel != null ? p.rayicBedel : '',
+    });
+    setEditError('');
+    setEditDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.ada.trim() || !editForm.parsel.trim() || !editForm.mahalle.trim()) {
+      setEditError('Ada, Parsel ve Mahalle zorunludur.');
+      return;
+    }
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await importService.updateParcel(editParcelId, {
+        ada: editForm.ada,
+        parsel: editForm.parsel,
+        mahalle: editForm.mahalle,
+        mevkii: editForm.mevkii || null,
+        alan: editForm.alan !== '' ? parseFloat(editForm.alan) : null,
+        nitelik: editForm.nitelik || null,
+        malikAdi: editForm.malikAdi || null,
+        paftaNo: editForm.paftaNo || null,
+        rayicBedel: editForm.rayicBedel !== '' ? parseFloat(editForm.rayicBedel) : null,
+      });
+      toast.success('Parsel güncellendi.');
+      setEditDialog(false);
+      fetchParcels({
+        ...(mahalleFilter && { mahalle: mahalleFilter }),
+        ...(batchFilter && { batchId: batchFilter })
+      });
+    } catch (e) {
+      setEditError(e.response?.data?.message || 'Güncelleme başarısız.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -138,13 +205,11 @@ export default function Import() {
             {uploading && <LinearProgress sx={{ mt: 2 }} />}
           </Paper>
 
-          {/* Şablon bilgi kutusu */}
           <Alert severity="info" sx={{ borderRadius: 2 }}>
             <strong>Excel sütun başlıkları (zorunlu: Ada, Parsel, Mahalle):</strong><br />
-            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo
+            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo | <strong>RayicBedel</strong>
           </Alert>
 
-          {/* Sonuç kutusu */}
           {lastResult && (
             <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: lastResult.errorRows > 0 ? 'warning.main' : 'success.main', borderRadius: 2 }}>
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
@@ -231,16 +296,17 @@ export default function Import() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: 'background.default' }}>
-                  {['Ada', 'Parsel', 'Mahalle', 'Mevkii', 'Alan (m²)', 'Nitelik', 'Malik Adı', 'Pafta No', 'Batch'].map(h => (
+                  {['Ada', 'Parsel', 'Mahalle', 'Mevkii', 'Alan (m²)', 'Nitelik', 'Malik Adı', 'Pafta No', 'Rayiç Bedel', 'Batch'].map(h => (
                     <TableCell key={h}><strong>{h}</strong></TableCell>
                   ))}
+                  {isManager && <TableCell align="center"><strong>İşlem</strong></TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loadingParcels ? (
-                  <TableRow><TableCell colSpan={9} align="center"><LinearProgress /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isManager ? 11 : 10} align="center"><LinearProgress /></TableCell></TableRow>
                 ) : parcels.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} align="center" sx={{ color: 'text.secondary', py: 4 }}>Parsel bulunamadı</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isManager ? 11 : 10} align="center" sx={{ color: 'text.secondary', py: 4 }}>Parsel bulunamadı</TableCell></TableRow>
                 ) : parcels.map(p => (
                   <TableRow key={p.id} hover>
                     <TableCell>{p.ada}</TableCell>
@@ -251,7 +317,21 @@ export default function Import() {
                     <TableCell>{p.nitelik || '-'}</TableCell>
                     <TableCell>{p.malikAdi || '-'}</TableCell>
                     <TableCell>{p.paftaNo || '-'}</TableCell>
+                    <TableCell>
+                      {p.rayicBedel != null
+                        ? <Chip label={fmtCurrency(p.rayicBedel)} size="small" color="success" variant="outlined" />
+                        : <Typography variant="caption" color="text.disabled">—</Typography>}
+                    </TableCell>
                     <TableCell><Chip label={p.importBatchId} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} /></TableCell>
+                    {isManager && (
+                      <TableCell align="center">
+                        <Tooltip title="Düzenle">
+                          <IconButton size="small" color="primary" onClick={() => openEditParcel(p)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -260,6 +340,77 @@ export default function Import() {
           <Typography variant="caption" color="text.secondary">{parcels.length} kayıt listeleniyor</Typography>
         </Stack>
       )}
+
+      {/* ── Parsel Düzenleme Dialog ── */}
+      <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <EditIcon /> Parsel Düzenle
+        </DialogTitle>
+        <DialogContent dividers>
+          {editError && <Alert severity="error" sx={{ mb: 2 }}>{editError}</Alert>}
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Ada" required fullWidth
+                value={editForm.ada}
+                onChange={e => setEditForm(p => ({ ...p, ada: e.target.value }))}
+              />
+              <TextField
+                label="Parsel" required fullWidth
+                value={editForm.parsel}
+                onChange={e => setEditForm(p => ({ ...p, parsel: e.target.value }))}
+              />
+            </Stack>
+            <TextField
+              label="Mahalle" required fullWidth
+              value={editForm.mahalle}
+              onChange={e => setEditForm(p => ({ ...p, mahalle: e.target.value }))}
+            />
+            <TextField
+              label="Mevkii" fullWidth
+              value={editForm.mevkii}
+              onChange={e => setEditForm(p => ({ ...p, mevkii: e.target.value }))}
+            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Alan (m²)" fullWidth type="number"
+                inputProps={{ step: '0.01', min: '0' }}
+                value={editForm.alan}
+                onChange={e => setEditForm(p => ({ ...p, alan: e.target.value }))}
+              />
+              <TextField
+                label="Rayiç Bedel (TL)" fullWidth type="number"
+                inputProps={{ step: '0.01', min: '0' }}
+                value={editForm.rayicBedel}
+                onChange={e => setEditForm(p => ({ ...p, rayicBedel: e.target.value }))}
+              />
+            </Stack>
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Nitelik" fullWidth
+                value={editForm.nitelik}
+                onChange={e => setEditForm(p => ({ ...p, nitelik: e.target.value }))}
+              />
+              <TextField
+                label="Pafta No" fullWidth
+                value={editForm.paftaNo}
+                onChange={e => setEditForm(p => ({ ...p, paftaNo: e.target.value }))}
+              />
+            </Stack>
+            <TextField
+              label="Malik Adı" fullWidth
+              value={editForm.malikAdi}
+              onChange={e => setEditForm(p => ({ ...p, malikAdi: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog(false)}>İptal</Button>
+          <Button onClick={handleSaveEdit} variant="contained" disabled={editSaving}>
+            {editSaving ? 'Kaydediliyor...' : 'Kaydet'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

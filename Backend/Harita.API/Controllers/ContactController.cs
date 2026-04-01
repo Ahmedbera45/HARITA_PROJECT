@@ -1,5 +1,6 @@
 using Harita.API.DTOs;
 using Harita.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Harita.API.Controllers
@@ -14,6 +15,7 @@ namespace Harita.API.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ContactController : ControllerBase, IContactController
     {
         private readonly IContactService _contactService;

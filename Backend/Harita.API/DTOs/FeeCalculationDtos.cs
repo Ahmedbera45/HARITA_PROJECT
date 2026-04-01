@@ -23,14 +23,32 @@ namespace Harita.API.DTOs
         public string Mahalle { get; set; } = string.Empty;
         public string? MalikAdi { get; set; }
         public string? Notlar { get; set; }
+        public Guid HesaplayanKullaniciId { get; set; }
         public string HesaplayanKullanici { get; set; } = string.Empty;
         public DateTime HesaplamaTarihi { get; set; }
     }
 
+    // Harç kalemleri — DB'den geliyor (artık statik değil)
     public class FeeRateDto
     {
+        public Guid Id { get; set; }
         public string RuhsatTuru { get; set; } = string.Empty;
         public double BirimHarc { get; set; }
-        public string Aciklama { get; set; } = string.Empty;
+        public string? Aciklama { get; set; }
+        public bool IsActive { get; set; }
+        public int SiraNo { get; set; }
+    }
+
+    public class CreateFeeRateDto
+    {
+        public required string RuhsatTuru { get; set; }
+        public double BirimHarc { get; set; }
+        public string? Aciklama { get; set; }
+        public int SiraNo { get; set; } = 0;
+    }
+
+    public class UpdateFeeRateDto : CreateFeeRateDto
+    {
+        public bool IsActive { get; set; } = true;
     }
 }
