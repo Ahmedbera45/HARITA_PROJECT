@@ -36,6 +36,7 @@ namespace Harita.API.Services
                     Id         = r.Id,
                     RuhsatTuru = r.RuhsatTuru,
                     BirimHarc  = r.BirimHarc,
+                    Katsayi    = r.Katsayi,
                     Aciklama   = r.Aciklama,
                     IsActive   = r.IsActive,
                     SiraNo     = r.SiraNo
@@ -52,6 +53,7 @@ namespace Harita.API.Services
             {
                 RuhsatTuru = dto.RuhsatTuru,
                 BirimHarc  = dto.BirimHarc,
+                Katsayi    = dto.Katsayi,
                 Aciklama   = dto.Aciklama,
                 IsActive   = true,
                 SiraNo     = dto.SiraNo
@@ -59,7 +61,7 @@ namespace Harita.API.Services
             _context.FeeRates.Add(rate);
             await _context.SaveChangesAsync();
 
-            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
+            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Katsayi = rate.Katsayi, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
         }
 
         public async Task<FeeRateDto> UpdateFeeRateAsync(Guid id, UpdateFeeRateDto dto)
@@ -69,12 +71,13 @@ namespace Harita.API.Services
 
             rate.RuhsatTuru = dto.RuhsatTuru;
             rate.BirimHarc  = dto.BirimHarc;
+            rate.Katsayi    = dto.Katsayi;
             rate.Aciklama   = dto.Aciklama;
             rate.IsActive   = dto.IsActive;
             rate.SiraNo     = dto.SiraNo;
             await _context.SaveChangesAsync();
 
-            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
+            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Katsayi = rate.Katsayi, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
         }
 
         public async Task<bool> DeleteFeeRateAsync(Guid id)
@@ -98,13 +101,14 @@ namespace Harita.API.Services
                 throw new Exception("Alan değeri sıfırdan büyük olmalıdır.");
 
             var userId = GetCurrentUserId();
+            var carpan = rate.Katsayi.HasValue ? rate.Katsayi.Value : 1.0;
             var entity = new FeeCalculation
             {
                 UserId     = userId,
                 RuhsatTuru = dto.RuhsatTuru,
                 AlanM2     = dto.AlanM2,
                 BirimHarc  = rate.BirimHarc,
-                ToplamHarc = Math.Round(dto.AlanM2 * rate.BirimHarc, 2),
+                ToplamHarc = Math.Round(dto.AlanM2 * rate.BirimHarc * carpan, 2),
                 Ada        = dto.Ada,
                 Parsel     = dto.Parsel,
                 Mahalle    = dto.Mahalle,

@@ -22,7 +22,7 @@ const formatCurrency = (val) =>
 const formatDate = (d) =>
   new Date(d).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
-const EMPTY_RATE_FORM = { ruhsatTuru: '', birimHarc: '', aciklama: '', siraNo: 0, isActive: true };
+const EMPTY_RATE_FORM = { ruhsatTuru: '', birimHarc: '', katsayi: '', aciklama: '', siraNo: 0, isActive: true };
 
 export default function FeeCalculation() {
   const { isManager } = useAuth();
@@ -74,9 +74,10 @@ export default function FeeCalculation() {
 
   const activeRates = rates.filter(r => r.isActive);
   const selectedRate = activeRates.find(r => r.ruhsatTuru === form.ruhsatTuru);
+  const katsayi = selectedRate?.katsayi ?? 1;
   const previewAmount =
     selectedRate && parseFloat(form.alanM2) > 0
-      ? Math.round(parseFloat(form.alanM2) * selectedRate.birimHarc * 100) / 100
+      ? Math.round(parseFloat(form.alanM2) * selectedRate.birimHarc * katsayi * 100) / 100
       : null;
 
   const handleCalculate = async () => {
@@ -141,6 +142,7 @@ export default function FeeCalculation() {
     setRateForm({
       ruhsatTuru: rate.ruhsatTuru,
       birimHarc: rate.birimHarc,
+      katsayi: rate.katsayi != null ? rate.katsayi : '',
       aciklama: rate.aciklama || '',
       siraNo: rate.siraNo,
       isActive: rate.isActive,
@@ -160,6 +162,7 @@ export default function FeeCalculation() {
       const payload = {
         ruhsatTuru: rateForm.ruhsatTuru,
         birimHarc: parseFloat(rateForm.birimHarc),
+        katsayi: rateForm.katsayi !== '' ? parseFloat(rateForm.katsayi) : null,
         aciklama: rateForm.aciklama || null,
         siraNo: parseInt(rateForm.siraNo) || 0,
         isActive: rateForm.isActive,
@@ -257,6 +260,7 @@ export default function FeeCalculation() {
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {parseFloat(form.alanM2)} m² × {selectedRate?.birimHarc} TL/m²
+                  {selectedRate?.katsayi != null && ` × ${selectedRate.katsayi} (katsayı)`}
                 </Typography>
               </Paper>
             )}
@@ -293,6 +297,7 @@ export default function FeeCalculation() {
                   <TableRow>
                     <TableCell>Ruhsat Türü</TableCell>
                     <TableCell align="right">TL/m²</TableCell>
+                    <TableCell align="right">Katsayı</TableCell>
                     {isManager && <TableCell align="center">Durum</TableCell>}
                     {isManager && <TableCell align="center">İşlem</TableCell>}
                   </TableRow>
@@ -310,6 +315,11 @@ export default function FeeCalculation() {
                       </TableCell>
                       <TableCell align="right">
                         <Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="right">
+                        {r.katsayi != null
+                          ? <Chip label={r.katsayi} size="small" color="warning" variant="outlined" />
+                          : <Typography variant="caption" color="text.disabled">—</Typography>}
                       </TableCell>
                       {isManager && (
                         <TableCell align="center">
@@ -438,6 +448,13 @@ export default function FeeCalculation() {
               inputProps={{ step: '0.01', min: '0' }}
               value={rateForm.birimHarc}
               onChange={e => setRateForm(p => ({ ...p, birimHarc: e.target.value }))}
+            />
+            <TextField
+              label="Katsayı (opsiyonel, örn: 0.3)" fullWidth type="number"
+              inputProps={{ step: '0.01', min: '0' }}
+              helperText="Girilirse: Alan × Birim Harç × Katsayı şeklinde hesaplanır"
+              value={rateForm.katsayi}
+              onChange={e => setRateForm(p => ({ ...p, katsayi: e.target.value }))}
             />
             <TextField
               label="Açıklama (opsiyonel)" fullWidth

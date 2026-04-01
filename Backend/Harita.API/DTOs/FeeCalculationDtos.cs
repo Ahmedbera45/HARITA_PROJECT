@@ -34,6 +34,7 @@ namespace Harita.API.DTOs
         public Guid Id { get; set; }
         public string RuhsatTuru { get; set; } = string.Empty;
         public double BirimHarc { get; set; }
+        public double? Katsayi { get; set; }
         public string? Aciklama { get; set; }
         public bool IsActive { get; set; }
         public int SiraNo { get; set; }
@@ -43,6 +44,7 @@ namespace Harita.API.DTOs
     {
         public required string RuhsatTuru { get; set; }
         public double BirimHarc { get; set; }
+        public double? Katsayi { get; set; }
         public string? Aciklama { get; set; }
         public int SiraNo { get; set; } = 0;
     }
