@@ -11,6 +11,7 @@ namespace Harita.API.Entities
         public string? MalikAdi { get; set; }
         public string? PaftaNo { get; set; }
         public decimal? RayicBedel { get; set; }      // TL cinsinden rayiç bedel
+        public string? YolGenisligi { get; set; }     // Örn: "15+", "10-15", "7m"
         public string? ImportBatchId { get; set; }
     }
 }

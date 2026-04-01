@@ -55,6 +55,9 @@ namespace Harita.API.Services
                     StartDate = l.StartDate,
                     EndDate = l.EndDate,
                     DaysCount = l.DaysCount,
+                    IsSaatlik = l.IsSaatlik,
+                    BaslangicSaati = l.BaslangicSaati,
+                    BitisSaati = l.BitisSaati,
                     Description = l.Description,
                     Status = l.Status,
                     ReviewNote = l.ReviewNote,
@@ -74,7 +77,13 @@ namespace Harita.API.Services
             if (dto.EndDate < dto.StartDate)
                 throw new Exception("Bitiş tarihi başlangıç tarihinden önce olamaz.");
 
-            var daysCount = (int)(dto.EndDate.Date - dto.StartDate.Date).TotalDays + 1;
+            if (dto.IsSaatlik)
+            {
+                if (string.IsNullOrWhiteSpace(dto.BaslangicSaati) || string.IsNullOrWhiteSpace(dto.BitisSaati))
+                    throw new Exception("Saatlik izin için başlangıç ve bitiş saati zorunludur.");
+            }
+
+            var daysCount = dto.IsSaatlik ? 0 : (int)(dto.EndDate.Date - dto.StartDate.Date).TotalDays + 1;
 
             var leave = new LeaveRequest
             {
@@ -83,6 +92,9 @@ namespace Harita.API.Services
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
                 DaysCount = daysCount,
+                IsSaatlik = dto.IsSaatlik,
+                BaslangicSaati = dto.IsSaatlik ? dto.BaslangicSaati : null,
+                BitisSaati = dto.IsSaatlik ? dto.BitisSaati : null,
                 Description = dto.Description,
                 Status = "Bekliyor"
             };
@@ -101,6 +113,9 @@ namespace Harita.API.Services
                 StartDate = leave.StartDate,
                 EndDate = leave.EndDate,
                 DaysCount = leave.DaysCount,
+                IsSaatlik = leave.IsSaatlik,
+                BaslangicSaati = leave.BaslangicSaati,
+                BitisSaati = leave.BitisSaati,
                 Description = leave.Description,
                 Status = leave.Status,
                 CreatedAt = leave.CreatedAt
@@ -141,6 +156,9 @@ namespace Harita.API.Services
                 StartDate = leave.StartDate,
                 EndDate = leave.EndDate,
                 DaysCount = leave.DaysCount,
+                IsSaatlik = leave.IsSaatlik,
+                BaslangicSaati = leave.BaslangicSaati,
+                BitisSaati = leave.BitisSaati,
                 Description = leave.Description,
                 Status = leave.Status,
                 ReviewNote = leave.ReviewNote,

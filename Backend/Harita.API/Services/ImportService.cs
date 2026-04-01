@@ -117,6 +117,7 @@ namespace Harita.API.Services
                     MalikAdi      = GetColIdx("MalikAdi") > 0 ? r.Cell(GetColIdx("MalikAdi")).GetString().Trim() : null,
                     PaftaNo       = GetColIdx("PaftaNo") > 0 ? r.Cell(GetColIdx("PaftaNo")).GetString().Trim() : null,
                     RayicBedel    = rayicBedel,
+                    YolGenisligi  = GetColIdx("YolGenisligi") > 0 ? r.Cell(GetColIdx("YolGenisligi")).GetString().Trim() : null,
                     ImportBatchId = batchId
                 });
             }
@@ -193,6 +194,7 @@ namespace Harita.API.Services
                     MalikAdi      = p.MalikAdi,
                     PaftaNo       = p.PaftaNo,
                     RayicBedel    = p.RayicBedel,
+                    YolGenisligi  = p.YolGenisligi,
                     ImportBatchId = p.ImportBatchId
                 })
                 .ToListAsync();
@@ -203,15 +205,16 @@ namespace Harita.API.Services
             var parcel = await _context.Parcels.FindAsync(id)
                 ?? throw new Exception("Parsel bulunamadı.");
 
-            parcel.Ada        = dto.Ada;
-            parcel.Parsel     = dto.Parsel;
-            parcel.Mahalle    = dto.Mahalle;
-            parcel.Mevkii     = dto.Mevkii;
-            parcel.Alan       = dto.Alan;
-            parcel.Nitelik    = dto.Nitelik;
-            parcel.MalikAdi   = dto.MalikAdi;
-            parcel.PaftaNo    = dto.PaftaNo;
-            parcel.RayicBedel = dto.RayicBedel;
+            parcel.Ada          = dto.Ada;
+            parcel.Parsel       = dto.Parsel;
+            parcel.Mahalle      = dto.Mahalle;
+            parcel.Mevkii       = dto.Mevkii;
+            parcel.Alan         = dto.Alan;
+            parcel.Nitelik      = dto.Nitelik;
+            parcel.MalikAdi     = dto.MalikAdi;
+            parcel.PaftaNo      = dto.PaftaNo;
+            parcel.RayicBedel   = dto.RayicBedel;
+            parcel.YolGenisligi = dto.YolGenisligi;
 
             await _context.SaveChangesAsync();
 
@@ -227,6 +230,7 @@ namespace Harita.API.Services
                 MalikAdi      = parcel.MalikAdi,
                 PaftaNo       = parcel.PaftaNo,
                 RayicBedel    = parcel.RayicBedel,
+                YolGenisligi  = parcel.YolGenisligi,
                 ImportBatchId = parcel.ImportBatchId
             };
         }

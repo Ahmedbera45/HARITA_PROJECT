@@ -34,6 +34,7 @@ namespace Harita.API.DTOs
         public string? MalikAdi { get; set; }
         public string? PaftaNo { get; set; }
         public decimal? RayicBedel { get; set; }
+        public string? YolGenisligi { get; set; }
         public string? ImportBatchId { get; set; }
     }
 
@@ -48,5 +49,6 @@ namespace Harita.API.DTOs
         public string? MalikAdi { get; set; }
         public string? PaftaNo { get; set; }
         public decimal? RayicBedel { get; set; }
+        public string? YolGenisligi { get; set; }
     }
 }

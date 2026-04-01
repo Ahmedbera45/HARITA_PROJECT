@@ -10,6 +10,9 @@ namespace Harita.API.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public int DaysCount { get; set; }
+        public bool IsSaatlik { get; set; }
+        public string? BaslangicSaati { get; set; }
+        public string? BitisSaati { get; set; }
         public string? Description { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? ReviewNote { get; set; }
@@ -23,6 +26,9 @@ namespace Harita.API.DTOs
         public required string LeaveType { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
+        public bool IsSaatlik { get; set; } = false;
+        public string? BaslangicSaati { get; set; }
+        public string? BitisSaati { get; set; }
         public string? Description { get; set; }
     }
 

@@ -20,7 +20,7 @@ const fmtCurrency = (val) =>
     : '-';
 
 const EMPTY_PARCEL_FORM = {
-  ada: '', parsel: '', mahalle: '', mevkii: '', alan: '', nitelik: '', malikAdi: '', paftaNo: '', rayicBedel: '',
+  ada: '', parsel: '', mahalle: '', mevkii: '', alan: '', nitelik: '', malikAdi: '', paftaNo: '', rayicBedel: '', yolGenisligi: '',
 };
 
 export default function Import() {
@@ -106,11 +106,25 @@ export default function Import() {
   };
 
   const downloadTemplate = () => {
-    const csv = 'Ada,Parsel,Mahalle,Mevkii,Alan,Nitelik,MalikAdi,PaftaNo,RayicBedel\n100,1,Merkez,Aşağı Mahalle,500,Arsa,Ali Veli,10-B,250000\n';
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    // Excel'in açabileceği HTML tablo formatı (.xls)
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Parseller</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body><table border="1">
+<tr style="background:#1976d2;color:white;font-weight:bold">
+  <td>Ada</td><td>Parsel</td><td>Mahalle</td><td>Mevkii</td><td>Alan</td>
+  <td>Nitelik</td><td>MalikAdi</td><td>PaftaNo</td><td>RayicBedel</td><td>YolGenisligi</td>
+</tr>
+<tr><td>100</td><td>1</td><td>Merkez</td><td>Aşağı Mah.</td><td>500</td><td>Arsa</td><td>Ali Veli</td><td>10-B</td><td>250000</td><td>15+</td></tr>
+<tr><td>200</td><td>5</td><td>Fatih</td><td>Yukarı Mah.</td><td>320</td><td>Konut</td><td>Ayşe Kaya</td><td>12-C</td><td>180000</td><td>10-15</td></tr>
+<tr><td>305</td><td>12</td><td>Cumhuriyet</td><td></td><td>750</td><td>Tarla</td><td></td><td>8-A</td><td></td><td>7m</td></tr>
+</table></body></html>`;
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'parsel_sablonu.csv'; a.click();
+    a.href = url; a.download = 'parsel_sablonu.xls'; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -127,6 +141,7 @@ export default function Import() {
       malikAdi: p.malikAdi || '',
       paftaNo: p.paftaNo || '',
       rayicBedel: p.rayicBedel != null ? p.rayicBedel : '',
+      yolGenisligi: p.yolGenisligi || '',
     });
     setEditError('');
     setEditDialog(true);
@@ -150,6 +165,7 @@ export default function Import() {
         malikAdi: editForm.malikAdi || null,
         paftaNo: editForm.paftaNo || null,
         rayicBedel: editForm.rayicBedel !== '' ? parseFloat(editForm.rayicBedel) : null,
+        yolGenisligi: editForm.yolGenisligi || null,
       });
       toast.success('Parsel güncellendi.');
       setEditDialog(false);
@@ -207,7 +223,8 @@ export default function Import() {
 
           <Alert severity="info" sx={{ borderRadius: 2 }}>
             <strong>Excel sütun başlıkları (zorunlu: Ada, Parsel, Mahalle):</strong><br />
-            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo | <strong>RayicBedel</strong>
+            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo | RayicBedel | <strong>YolGenisligi</strong>
+            <br /><Typography variant="caption" color="text.secondary">Örn: YolGenisligi → "15+", "10-15", "7m"</Typography>
           </Alert>
 
           {lastResult && (
@@ -296,7 +313,7 @@ export default function Import() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: 'background.default' }}>
-                  {['Ada', 'Parsel', 'Mahalle', 'Mevkii', 'Alan (m²)', 'Nitelik', 'Malik Adı', 'Pafta No', 'Rayiç Bedel', 'Batch'].map(h => (
+                  {['Ada', 'Parsel', 'Mahalle', 'Mevkii', 'Alan (m²)', 'Nitelik', 'Malik Adı', 'Pafta No', 'Rayiç Bedel', 'Yol Gen.', 'Batch'].map(h => (
                     <TableCell key={h}><strong>{h}</strong></TableCell>
                   ))}
                   {isManager && <TableCell align="center"><strong>İşlem</strong></TableCell>}
@@ -304,9 +321,9 @@ export default function Import() {
               </TableHead>
               <TableBody>
                 {loadingParcels ? (
-                  <TableRow><TableCell colSpan={isManager ? 11 : 10} align="center"><LinearProgress /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isManager ? 12 : 11} align="center"><LinearProgress /></TableCell></TableRow>
                 ) : parcels.length === 0 ? (
-                  <TableRow><TableCell colSpan={isManager ? 11 : 10} align="center" sx={{ color: 'text.secondary', py: 4 }}>Parsel bulunamadı</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isManager ? 12 : 11} align="center" sx={{ color: 'text.secondary', py: 4 }}>Parsel bulunamadı</TableCell></TableRow>
                 ) : parcels.map(p => (
                   <TableRow key={p.id} hover>
                     <TableCell>{p.ada}</TableCell>
@@ -320,6 +337,11 @@ export default function Import() {
                     <TableCell>
                       {p.rayicBedel != null
                         ? <Chip label={fmtCurrency(p.rayicBedel)} size="small" color="success" variant="outlined" />
+                        : <Typography variant="caption" color="text.disabled">—</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      {p.yolGenisligi
+                        ? <Chip label={p.yolGenisligi} size="small" color="info" variant="outlined" />
                         : <Typography variant="caption" color="text.disabled">—</Typography>}
                     </TableCell>
                     <TableCell><Chip label={p.importBatchId} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} /></TableCell>
@@ -397,11 +419,18 @@ export default function Import() {
                 onChange={e => setEditForm(p => ({ ...p, paftaNo: e.target.value }))}
               />
             </Stack>
-            <TextField
-              label="Malik Adı" fullWidth
-              value={editForm.malikAdi}
-              onChange={e => setEditForm(p => ({ ...p, malikAdi: e.target.value }))}
-            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Malik Adı" fullWidth
+                value={editForm.malikAdi}
+                onChange={e => setEditForm(p => ({ ...p, malikAdi: e.target.value }))}
+              />
+              <TextField
+                label="Yol Genişliği (örn: 15+)" fullWidth
+                value={editForm.yolGenisligi}
+                onChange={e => setEditForm(p => ({ ...p, yolGenisligi: e.target.value }))}
+              />
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions>
