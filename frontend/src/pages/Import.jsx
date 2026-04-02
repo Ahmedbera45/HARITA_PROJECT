@@ -106,27 +106,16 @@ export default function Import() {
     });
   };
 
-  const downloadTemplate = () => {
-    // Excel'in açabileceği HTML tablo formatı (.xls)
-    const html = `
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-<x:Name>Parseller</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-<body><table border="1">
-<tr style="background:#1976d2;color:white;font-weight:bold">
-  <td>Ada</td><td>Parsel</td><td>Mahalle</td><td>Mevkii</td><td>Alan</td>
-  <td>Nitelik</td><td>MalikAdi</td><td>PaftaNo</td><td>RayicBedel</td><td>YolGenisligi</td>
-</tr>
-<tr><td>100</td><td>1</td><td>Merkez</td><td>Aşağı Mah.</td><td>500</td><td>Arsa</td><td>Ali Veli</td><td>10-B</td><td>250000</td><td>15+</td></tr>
-<tr><td>200</td><td>5</td><td>Fatih</td><td>Yukarı Mah.</td><td>320</td><td>Konut</td><td>Ayşe Kaya</td><td>12-C</td><td>180000</td><td>10-15</td></tr>
-<tr><td>305</td><td>12</td><td>Cumhuriyet</td><td></td><td>750</td><td>Tarla</td><td></td><td>8-A</td><td></td><td>7m</td></tr>
-</table></body></html>`;
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'parsel_sablonu.xls'; a.click();
-    URL.revokeObjectURL(url);
+  const downloadTemplate = async () => {
+    try {
+      const res = await importService.getTemplate();
+      const url = URL.createObjectURL(res);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'parsel_sablonu.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Şablon indirilemedi.');
+    }
   };
 
   // ── Parsel düzenleme ──────────────────────────────────────────────
