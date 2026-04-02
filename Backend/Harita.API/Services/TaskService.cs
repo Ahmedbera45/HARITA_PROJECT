@@ -32,14 +32,15 @@ namespace Harita.API.Services
 
         private static TaskDto MapToDto(AppTask t) => new()
         {
-            Id          = t.Id,
-            Title       = t.Title,
-            Description = t.Description,
-            Status      = t.Status,
-            Priority    = t.Priority,
-            DueDate     = t.DueDate,
-            CreatedAt   = t.CreatedAt,
-            AssignedUsers = t.Assignments?.Select(a => new AssignedUserDto
+            Id              = t.Id,
+            Title           = t.Title,
+            Description     = t.Description,
+            Status          = t.Status,
+            Priority        = t.Priority,
+            DueDate         = t.DueDate,
+            CreatedAt       = t.CreatedAt,
+            CreatedByUserId = t.CreatedByUserId,
+            AssignedUsers   = t.Assignments?.Select(a => new AssignedUserDto
             {
                 Id         = a.User.Id,
                 FullName   = $"{a.User.Name} {a.User.Surname}",
@@ -90,22 +91,20 @@ namespace Harita.API.Services
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
 
-            // Atama listesini belirle:
-            // Manager/Admin → DTO'daki listeyi kullan
-            // Staff → havuza ekler (atanmamış), yönetici atar
-            var assignIds = isManager
-                ? dto.AssignedUserIds
-                : new List<Guid>();
-
-            await SetAssignmentsAsync(task.Id, assignIds);
+            // Herkes oluştururken atayabilir
+            await SetAssignmentsAsync(task.Id, dto.AssignedUserIds);
 
             return await GetByIdAsync(task.Id) ?? MapToDto(task);
         }
 
         public async Task<TaskDto> UpdateAsync(Guid id, UpdateTaskDto dto)
         {
+            var currentUserId = GetCurrentUserId();
             var task = await _context.Tasks.FindAsync(id)
                 ?? throw new Exception("Görev bulunamadı.");
+
+            if (!IsManager() && task.CreatedByUserId != currentUserId)
+                throw new UnauthorizedAccessException("Bu görevi düzenleme yetkiniz yok.");
 
             task.Title       = dto.Title;
             task.Description = dto.Description;
@@ -115,9 +114,8 @@ namespace Harita.API.Services
 
             await _context.SaveChangesAsync();
 
-            // Manager/Admin atama listesini değiştirebilir
-            if (IsManager())
-                await SetAssignmentsAsync(id, dto.AssignedUserIds);
+            // Herkes atama listesini güncelleyebilir
+            await SetAssignmentsAsync(id, dto.AssignedUserIds);
 
             return await GetByIdAsync(id) ?? MapToDto(task);
         }

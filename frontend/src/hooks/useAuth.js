@@ -41,5 +41,7 @@ export function useAuth() {
     return roles.includes(role);
   }
 
-  return { user, role, isAdmin, isManager, isStaff, isLoggedIn, hasRole };
+  const userId = user?.id ?? null;
+
+  return { user, userId, role, isAdmin, isManager, isStaff, isLoggedIn, hasRole };
 }

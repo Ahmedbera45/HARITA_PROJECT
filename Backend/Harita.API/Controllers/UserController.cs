@@ -17,9 +17,8 @@ namespace Harita.API.Controllers
             _userService = userService;
         }
 
-        // Tüm kullanıcılar — Sadece yönetici/admin
+        // Tüm kullanıcılar — login olan herkes (görev atama için)
         [HttpGet]
-        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _userService.GetAllAsync();

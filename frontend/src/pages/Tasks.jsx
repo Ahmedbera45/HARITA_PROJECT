@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import {
   Add, Delete, Edit, ArrowForward, ArrowBack,
-  AccessTime, Warning, FilterList, PersonAdd
+  AccessTime, Warning, FilterList
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import taskService from '../services/taskService';
@@ -47,30 +47,22 @@ export default function Tasks() {
 
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [filterAssignee, setFilterAssignee] = useState('');
 
-  // Form dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
 
-  // Silme dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-  // Hızlı atama dialog (yönetici)
-  const [assignDialog, setAssignDialog] = useState(false);
-  const [assignTarget, setAssignTarget] = useState(null);
-  const [assignUserIds, setAssignUserIds] = useState([]);
-
-  const { isManager } = useAuth();
+  const { isManager, userId } = useAuth();
 
   useEffect(() => {
     fetchTasks();
-    if (isManager) {
-      userService.getAll().then(setUsers).catch(() => {});
-    }
+    userService.getAll().then(setUsers).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -91,6 +83,8 @@ export default function Tasks() {
       setLoading(false);
     }
   };
+
+  const canEdit = (task) => isManager || task.createdByUserId === userId;
 
   const handleOpenCreate = () => {
     setFormData(EMPTY_FORM);
@@ -166,10 +160,8 @@ export default function Tasks() {
     const statuses = ['Bekliyor', 'İşlemde', 'Bitti'];
     const currentIndex = statuses.indexOf(task.status);
     let newStatus = task.status;
-
     if (direction === 'next' && currentIndex < 2) newStatus = statuses[currentIndex + 1];
     if (direction === 'prev' && currentIndex > 0) newStatus = statuses[currentIndex - 1];
-
     if (newStatus !== task.status) {
       try {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
@@ -188,59 +180,26 @@ export default function Tasks() {
     }
   };
 
-  const handleOpenAssign = (task) => {
-    setAssignTarget(task);
-    setAssignUserIds(task.assignedUsers?.map(u => u.id) ?? []);
-    setAssignDialog(true);
-  };
+  // Atanan kişi filtrelemesi frontend'de yapılır
+  const filteredTasks = (statusKey) => tasks.filter(t => {
+    if (t.status !== statusKey) return false;
+    if (filterAssignee && !t.assignedUsers?.some(u => u.id === filterAssignee)) return false;
+    return true;
+  });
 
-  const handleQuickAssign = async () => {
-    setSaving(true);
-    try {
-      await taskService.update(assignTarget.id, {
-        title: assignTarget.title,
-        description: assignTarget.description || '',
-        status: assignTarget.status,
-        priority: assignTarget.priority,
-        dueDate: assignTarget.dueDate ? assignTarget.dueDate.split('T')[0] : null,
-        assignedUserIds: assignUserIds
-      });
-      toast.success(assignUserIds.length > 0 ? 'Görev atandı.' : 'Atama kaldırıldı.');
-      setAssignDialog(false);
-      fetchTasks();
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Atama başarısız.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const unassignedTasks = tasks.filter(t => !t.assignedUsers || t.assignedUsers.length === 0);
-  const filteredTasks = (statusKey) => tasks.filter(t => t.status === statusKey);
-
-  // Görev Kartı Sütunu
   const TaskColumn = ({ title, statusKey, color }) => (
     <Grid size={{ xs: 12, md: 4 }}>
-      <Paper
-        elevation={0}
-        sx={{ p: 2, bgcolor: 'background.default', height: '100%', borderTop: `4px solid ${color}` }}
-      >
+      <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', height: '100%', borderTop: `4px solid ${color}` }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6" fontWeight="bold">{title}</Typography>
           <Chip label={filteredTasks(statusKey).length} size="small" />
         </Box>
-
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {filteredTasks(statusKey).map((task) => (
             <Card key={task.id} sx={{ '&:hover': { boxShadow: 3 }, transition: '0.3s' }}>
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Chip
-                    label={task.priority}
-                    size="small"
-                    color={PRIORITY_COLORS[task.priority] || 'default'}
-                    variant="outlined"
-                  />
+                  <Chip label={task.priority} size="small" color={PRIORITY_COLORS[task.priority] || 'default'} variant="outlined" />
                   {task.dueDate && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', color: 'text.secondary' }}>
                       <AccessTime fontSize="inherit" /> {formatDate(task.dueDate)}
@@ -257,7 +216,6 @@ export default function Tasks() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, pt: 1, borderTop: '1px solid #eee' }}>
-                  {/* Atanan kullanıcı avatarları */}
                   {task.assignedUsers && task.assignedUsers.length > 0 ? (
                     <Tooltip title={task.assignedUsers.map(u => u.fullName).join(', ')}>
                       <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: '0.65rem' } }}>
@@ -276,11 +234,13 @@ export default function Tasks() {
                     {statusKey !== 'Bekliyor' && (
                       <IconButton size="small" onClick={() => moveTask(task, 'prev')}><ArrowBack fontSize="small" /></IconButton>
                     )}
-                    <IconButton size="small" color="primary" onClick={() => handleOpenEdit(task)}><Edit fontSize="small" /></IconButton>
+                    {canEdit(task) && (
+                      <IconButton size="small" color="primary" onClick={() => handleOpenEdit(task)}><Edit fontSize="small" /></IconButton>
+                    )}
                     {statusKey !== 'Bitti' && (
                       <IconButton size="small" color="success" onClick={() => moveTask(task, 'next')}><ArrowForward fontSize="small" /></IconButton>
                     )}
-                    {(isManager || statusKey === 'Bitti') && (
+                    {(isManager || task.createdByUserId === userId) && (
                       <IconButton size="small" color="error" onClick={() => handleDeleteClick(task.id)}><Delete fontSize="small" /></IconButton>
                     )}
                   </Box>
@@ -305,73 +265,36 @@ export default function Tasks() {
 
       {/* Filtre Çubukları */}
       <Paper elevation={0} sx={{ p: 2, mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" gap={1}>
           <FilterList fontSize="small" color="action" />
-          <Typography variant="body2" color="text.secondary" fontWeight={600}>Filtre:</Typography>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>Durum:</Typography>
           {['', 'Bekliyor', 'İşlemde', 'Bitti'].map(s => (
-            <Chip
-              key={s || 'all'}
-              label={s || 'Tümü'}
-              onClick={() => setFilterStatus(s)}
+            <Chip key={s || 'all'} label={s || 'Tümü'} onClick={() => setFilterStatus(s)}
               color={filterStatus === s ? 'primary' : 'default'}
-              variant={filterStatus === s ? 'filled' : 'outlined'}
-              size="small"
-            />
+              variant={filterStatus === s ? 'filled' : 'outlined'} size="small" />
           ))}
           <Box sx={{ width: 1, display: { xs: 'block', sm: 'none' } }} />
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>Öncelik:</Typography>
           {['', 'Düşük', 'Orta', 'Yüksek'].map(p => (
-            <Chip
-              key={p || 'allp'}
-              label={p || 'Tüm Öncelikler'}
-              onClick={() => setFilterPriority(p)}
+            <Chip key={p || 'allp'} label={p || 'Tümü'} onClick={() => setFilterPriority(p)}
               color={filterPriority === p ? 'secondary' : 'default'}
-              variant={filterPriority === p ? 'filled' : 'outlined'}
-              size="small"
-            />
+              variant={filterPriority === p ? 'filled' : 'outlined'} size="small" />
           ))}
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>Atanan:</Typography>
+          <Select
+            size="small"
+            value={filterAssignee}
+            onChange={e => setFilterAssignee(e.target.value)}
+            displayEmpty
+            sx={{ minWidth: 160, height: 32 }}
+          >
+            <MenuItem value=""><em>Tümü</em></MenuItem>
+            {users.map(u => (
+              <MenuItem key={u.id} value={u.id}>{u.fullName}</MenuItem>
+            ))}
+          </Select>
         </Stack>
       </Paper>
-
-      {/* Yönetici: Atanmamış Görev Havuzu */}
-      {isManager && unassignedTasks.length > 0 && (
-        <Paper elevation={0} sx={{ p: 2, mb: 2, border: '2px dashed', borderColor: 'warning.main', borderRadius: 2 }}>
-          <Typography variant="subtitle2" fontWeight="bold" color="warning.dark" sx={{ mb: 1.5 }}>
-            Görev Havuzu — Atama Bekleyen ({unassignedTasks.length} görev)
-          </Typography>
-          <Stack spacing={0.5}>
-            {unassignedTasks.map(task => (
-              <Box
-                key={task.id}
-                sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  p: 1, bgcolor: 'background.paper', borderRadius: 1,
-                  border: '1px solid', borderColor: 'divider'
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
-                  <Chip label={task.priority} size="small" color={PRIORITY_COLORS[task.priority] || 'default'} variant="outlined" />
-                  <Typography variant="body2" noWrap sx={{ flex: 1 }}>{task.title}</Typography>
-                  {task.dueDate && (
-                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                      {formatDate(task.dueDate)}
-                    </Typography>
-                  )}
-                </Box>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="warning"
-                  startIcon={<PersonAdd />}
-                  onClick={() => handleOpenAssign(task)}
-                  sx={{ ml: 1, flexShrink: 0 }}
-                >
-                  Ata
-                </Button>
-              </Box>
-            ))}
-          </Stack>
-        </Paper>
-      )}
 
       <Grid container spacing={3} sx={{ height: 'calc(100vh - 300px)', overflowY: 'auto' }}>
         <TaskColumn title="📌 Bekleyen İşler" statusKey="Bekliyor" color="#f59e0b" />
@@ -385,9 +308,7 @@ export default function Tasks() {
           <Warning color="error" /> Görevi Sil
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            Bu görevi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-          </DialogContentText>
+          <DialogContentText>Bu görevi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>İptal</Button>
@@ -401,125 +322,52 @@ export default function Tasks() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Görev Başlığı" required fullWidth
+              <TextField label="Görev Başlığı" required fullWidth
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              />
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Detaylar / Açıklama" fullWidth multiline rows={3}
+              <TextField label="Detaylar / Açıklama" fullWidth multiline rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 6 }}>
-              <TextField
-                select label="Öncelik" fullWidth
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              >
+              <TextField select label="Öncelik" fullWidth value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}>
                 <MenuItem value="Düşük">Düşük</MenuItem>
                 <MenuItem value="Orta">Orta</MenuItem>
                 <MenuItem value="Yüksek">Yüksek</MenuItem>
               </TextField>
             </Grid>
             <Grid size={{ xs: 6 }}>
-              <TextField
-                type="date" label="Son Tarih" fullWidth
-                InputLabelProps={{ shrink: true }}
+              <TextField type="date" label="Son Tarih" fullWidth InputLabelProps={{ shrink: true }}
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              />
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
             </Grid>
-            {/* Yönetici ise çoklu kullanıcı atama */}
-            {isManager && (
-              <Grid size={{ xs: 12 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Atanan Kişiler</InputLabel>
-                  <Select
-                    multiple
-                    value={formData.assignedUserIds}
-                    onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
-                    input={<OutlinedInput label="Atanan Kişiler" />}
-                    renderValue={(selected) =>
-                      users
-                        .filter(u => selected.includes(u.id))
-                        .map(u => u.fullName)
-                        .join(', ') || '— Seçilmedi —'
-                    }
-                  >
-                    {users.map(u => (
-                      <MenuItem key={u.id} value={u.id}>
-                        <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
-                        <ListItemText primary={u.fullName} secondary={u.department} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
-            {!isManager && !isEdit && (
-              <Grid size={{ xs: 12 }}>
-                <Typography variant="caption" color="text.secondary">
-                  * Görev havuzuna eklenecek; yönetici atama yapacaktır.
-                </Typography>
-              </Grid>
-            )}
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>İptal</Button>
-          <Button onClick={handleSave} variant="contained" disabled={saving}>
-            {saving ? 'Kaydediliyor...' : 'Kaydet'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Hızlı Atama Dialog (Yönetici) */}
-      <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PersonAdd color="warning" /> Görev Ata
-        </DialogTitle>
-        <DialogContent dividers>
-          {assignTarget && (
-            <Stack spacing={2} sx={{ mt: 0.5 }}>
-              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
-                <Typography variant="body2" fontWeight={600}>{assignTarget.title}</Typography>
-                <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                  <Chip label={assignTarget.priority} size="small" color={PRIORITY_COLORS[assignTarget.priority] || 'default'} variant="outlined" />
-                  <Chip label={assignTarget.status} size="small" variant="outlined" />
-                </Box>
-              </Paper>
+            <Grid size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <InputLabel>Atanan Kişiler</InputLabel>
-                <Select
-                  multiple
-                  value={assignUserIds}
-                  onChange={e => setAssignUserIds(e.target.value)}
+                <Select multiple value={formData.assignedUserIds}
+                  onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
                   input={<OutlinedInput label="Atanan Kişiler" />}
                   renderValue={(selected) =>
-                    users
-                      .filter(u => selected.includes(u.id))
-                      .map(u => u.fullName)
-                      .join(', ') || '— Seçilmedi —'
+                    users.filter(u => selected.includes(u.id)).map(u => u.fullName).join(', ') || '— Seçilmedi —'
                   }
                 >
                   {users.map(u => (
                     <MenuItem key={u.id} value={u.id}>
-                      <Checkbox checked={assignUserIds.includes(u.id)} />
+                      <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
                       <ListItemText primary={u.fullName} secondary={u.department} />
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-            </Stack>
-          )}
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAssignDialog(false)}>İptal</Button>
-          <Button onClick={handleQuickAssign} variant="contained" color="warning" disabled={saving}>
+          <Button onClick={() => setOpenDialog(false)}>İptal</Button>
+          <Button onClick={handleSave} variant="contained" disabled={saving}>
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
           </Button>
         </DialogActions>
