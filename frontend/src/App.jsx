@@ -45,21 +45,13 @@ function App() {
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/map" element={<ComingSoon title="Harita / CBS" />} />
 
-          {/* Manager + Admin */}
-          <Route path="/import" element={
-            <RoleRoute roles={['Admin', 'Manager']}>
-              <Import />
-            </RoleRoute>
-          } />
-          <Route path="/fee-calculation" element={
-            <RoleRoute roles={['Admin', 'Manager']}>
-              <FeeCalculation />
-            </RoleRoute>
-          } />
+          {/* Tüm roller — veri yükleme ve harç hesaplama */}
+          <Route path="/import" element={<Import />} />
+          <Route path="/fee-calculation" element={<FeeCalculation />} />
 
-          {/* Sadece Admin */}
+          {/* Sadece Admin + Manager */}
           <Route path="/users" element={
-            <RoleRoute roles={['Admin']}>
+            <RoleRoute roles={['Admin', 'Manager']}>
               <Users />
             </RoleRoute>
           } />

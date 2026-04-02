@@ -46,10 +46,10 @@ const ALL_MENU_ITEMS = [
   { text: 'Kurum Rehberi',   icon: <PeopleIcon />,     path: '/directory',      roles: [] },
   { text: 'Görev Takip',     icon: <AssignmentIcon />, path: '/tasks',          roles: [] },
   { text: 'İzin Yönetimi',   icon: <LeaveIcon />,      path: '/leaves',         roles: [] },
-  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',         roles: ['Admin', 'Manager'] },
-  { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation',roles: ['Admin', 'Manager'] },
+  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',         roles: [] },
+  { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation',roles: [] },
   { text: 'Harita / CBS',    icon: <MapIcon />,         path: '/map',            roles: [] },
-  { text: 'Kullanıcı Yön.', icon: <AdminIcon />,       path: '/users',          roles: ['Admin'] },
+  { text: 'Kullanıcı Yön.', icon: <AdminIcon />,       path: '/users',          roles: ['Admin', 'Manager'] },
 ];
 
 function parseJwtUser() {

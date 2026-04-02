@@ -25,7 +25,8 @@ const EMPTY_PARCEL_FORM = {
 
 export default function Import() {
   const { isManager } = useAuth();
-  const [tab, setTab] = useState(0);
+  // Staff kullanıcılar doğrudan Parsel Listesi'nden başlar
+  const [tab, setTab] = useState(isManager ? 0 : 2);
 
   // Upload state
   const [file, setFile] = useState(null);
@@ -188,9 +189,9 @@ export default function Import() {
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Tab label="Yükle" icon={<CloudUpload />} iconPosition="start" />
-        <Tab label="Geçmiş" icon={<History />} iconPosition="start" />
-        <Tab label="Parsel Listesi" icon={<TableChart />} iconPosition="start" />
+        {isManager && <Tab value={0} label="Yükle" icon={<CloudUpload />} iconPosition="start" />}
+        {isManager && <Tab value={1} label="Geçmiş" icon={<History />} iconPosition="start" />}
+        <Tab value={2} label="Parsel Listesi" icon={<TableChart />} iconPosition="start" />
       </Tabs>
 
       {/* ─── TAB 0: YÜKLE ─── */}
