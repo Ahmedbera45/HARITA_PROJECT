@@ -140,11 +140,18 @@ namespace Harita.API.Services
 
         public async Task<FeeCalculationDto?> GetByIdAsync(Guid id)
         {
+            var userId = GetCurrentUserId();
+            var role = _accessor.HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            var isManager = role == "Manager" || role == "Admin";
+
             var f = await _context.FeeCalculations
                 .Include(f => f.User)
                 .FirstOrDefaultAsync(f => f.Id == id);
 
-            return f == null ? null : MapToDto(f, f.User);
+            if (f == null) return null;
+            if (!isManager && f.UserId != userId) return null;
+
+            return MapToDto(f, f.User);
         }
 
         public async Task<bool> DeleteAsync(Guid id)
