@@ -40,9 +40,6 @@ namespace Harita.API.Services
                 .Include(l => l.ReviewedByUser)
                 .AsQueryable();
 
-            if (!isManager)
-                query = query.Where(l => l.UserId == currentUserId);
-
             return await query
                 .OrderByDescending(l => l.CreatedAt)
                 .Select(l => new LeaveRequestDto

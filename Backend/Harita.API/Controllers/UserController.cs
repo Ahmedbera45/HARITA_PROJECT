@@ -17,8 +17,9 @@ namespace Harita.API.Controllers
             _userService = userService;
         }
 
-        // Tüm kullanıcılar (görev atama dropdown'u için Staff de çağırabilir)
+        // Tüm kullanıcılar — Sadece yönetici/admin
         [HttpGet]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _userService.GetAllAsync();
@@ -36,7 +37,7 @@ namespace Harita.API.Controllers
 
         // Yeni kullanıcı oluştur — Sadece Admin
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Create(CreateUserDto dto)
         {
             try
@@ -52,7 +53,7 @@ namespace Harita.API.Controllers
 
         // Kullanıcı güncelle (bilgi + rol) — Sadece Admin
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Update(Guid id, UpdateUserDto dto)
         {
             try
@@ -68,7 +69,7 @@ namespace Harita.API.Controllers
 
         // Kullanıcı sil (soft delete) — Sadece Admin
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(Guid id)
         {
             try
@@ -85,7 +86,7 @@ namespace Harita.API.Controllers
 
         // Şifre sıfırla — Sadece Admin
         [HttpPut("{id}/password")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> ChangePassword(Guid id, ChangePasswordDto dto)
         {
             try

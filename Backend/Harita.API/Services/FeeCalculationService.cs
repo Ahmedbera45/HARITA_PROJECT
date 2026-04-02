@@ -126,32 +126,20 @@ namespace Harita.API.Services
 
         public async Task<List<FeeCalculationDto>> GetAllAsync()
         {
-            var userId = GetCurrentUserId();
-            var role = _accessor.HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-            var isManager = role == "Manager" || role == "Admin";
-
-            var query = _context.FeeCalculations.Include(f => f.User).AsQueryable();
-            if (!isManager)
-                query = query.Where(f => f.UserId == userId);
-
-            var list = await query.OrderByDescending(f => f.CreatedAt).ToListAsync();
+            var list = await _context.FeeCalculations
+                .Include(f => f.User)
+                .OrderByDescending(f => f.CreatedAt)
+                .ToListAsync();
             return list.Select(f => MapToDto(f, f.User)).ToList();
         }
 
         public async Task<FeeCalculationDto?> GetByIdAsync(Guid id)
         {
-            var userId = GetCurrentUserId();
-            var role = _accessor.HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-            var isManager = role == "Manager" || role == "Admin";
-
             var f = await _context.FeeCalculations
                 .Include(f => f.User)
                 .FirstOrDefaultAsync(f => f.Id == id);
 
-            if (f == null) return null;
-            if (!isManager && f.UserId != userId) return null;
-
-            return MapToDto(f, f.User);
+            return f == null ? null : MapToDto(f, f.User);
         }
 
         public async Task<bool> DeleteAsync(Guid id)

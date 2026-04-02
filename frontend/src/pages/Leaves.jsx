@@ -141,7 +141,7 @@ export default function Leaves() {
         <Box>
           <Typography variant="h5" fontWeight="bold">İzin Yönetimi</Typography>
           <Typography variant="body2" color="text.secondary">
-            {isManager ? 'Tüm personel izin talepleri' : 'İzin talepleriniz'}
+            Tüm personel izin talepleri
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
@@ -173,7 +173,7 @@ export default function Leaves() {
         <Table>
           <TableHead>
             <TableRow sx={{ bgcolor: 'background.default' }}>
-              {isManager && <TableCell><strong>Personel</strong></TableCell>}
+              <TableCell><strong>Personel</strong></TableCell>
               <TableCell><strong>İzin Türü</strong></TableCell>
               <TableCell><strong>Tarih</strong></TableCell>
               <TableCell><strong>Süre / Saat</strong></TableCell>
@@ -184,24 +184,22 @@ export default function Leaves() {
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={isManager ? 7 : 6} align="center">Yükleniyor...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center">Yükleniyor...</TableCell></TableRow>
             ) : leaves.length === 0 ? (
-              <TableRow><TableCell colSpan={isManager ? 7 : 6} align="center" sx={{ color: 'text.secondary', py: 4 }}>Kayıt bulunamadı</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>Kayıt bulunamadı</TableCell></TableRow>
             ) : leaves.map(l => (
               <TableRow key={l.id} hover>
-                {isManager && (
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', bgcolor: 'primary.light' }}>
-                        {(l.userFullName || '?')[0]}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600}>{l.userFullName}</Typography>
-                        <Typography variant="caption" color="text.secondary">{l.userDepartment}</Typography>
-                      </Box>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Avatar sx={{ width: 28, height: 28, fontSize: '0.8rem', bgcolor: 'primary.light' }}>
+                      {(l.userFullName || '?')[0]}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>{l.userFullName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{l.userDepartment}</Typography>
                     </Box>
-                  </TableCell>
-                )}
+                  </Box>
+                </TableCell>
                 <TableCell>
                   <Chip
                     label={l.leaveType}

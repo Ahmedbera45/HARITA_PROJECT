@@ -463,7 +463,7 @@ export default function Tasks() {
             {!isManager && !isEdit && (
               <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" color="text.secondary">
-                  * Görev oluşturulunca otomatik olarak size atanacaktır.
+                  * Görev havuzuna eklenecek; yönetici atama yapacaktır.
                 </Typography>
               </Grid>
             )}

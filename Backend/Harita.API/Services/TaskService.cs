@@ -49,18 +49,9 @@ namespace Harita.API.Services
 
         public async Task<List<TaskDto>> GetAllAsync(string? status = null, string? priority = null)
         {
-            var currentUserId = GetCurrentUserId();
-            var isManager = IsManager();
-
             var query = _context.Tasks
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .AsQueryable();
-
-            // Manager/Admin: tüm görevleri görür. Staff: sadece kendine atanan veya kendisinin oluşturduğu
-            if (!isManager)
-                query = query.Where(t =>
-                    t.CreatedByUserId == currentUserId ||
-                    t.Assignments.Any(a => a.UserId == currentUserId));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(t => t.Status == status);
@@ -100,11 +91,11 @@ namespace Harita.API.Services
             await _context.SaveChangesAsync();
 
             // Atama listesini belirle:
-            // Manager/Admin → DTO'daki listeyi kullan (boşsa atanmamış bırak)
-            // Staff → kendi görevini kendine ata (havuza atmasın)
+            // Manager/Admin → DTO'daki listeyi kullan
+            // Staff → havuza ekler (atanmamış), yönetici atar
             var assignIds = isManager
                 ? dto.AssignedUserIds
-                : new List<Guid> { currentUserId };
+                : new List<Guid>();
 
             await SetAssignmentsAsync(task.Id, assignIds);
 
@@ -142,14 +133,7 @@ namespace Harita.API.Services
 
         public async Task<TaskSummaryDto> GetSummaryAsync()
         {
-            var currentUserId = GetCurrentUserId();
-            var isManager = IsManager();
-
             var query = _context.Tasks.AsQueryable();
-            if (!isManager)
-                query = query.Where(t =>
-                    t.CreatedByUserId == currentUserId ||
-                    t.Assignments.Any(a => a.UserId == currentUserId));
 
             var tasks = await query.ToListAsync();
             return new TaskSummaryDto
