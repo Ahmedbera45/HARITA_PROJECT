@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Harita.API.Data;
 using Harita.API.DTOs;
 using Harita.API.Entities;
@@ -30,7 +31,8 @@ namespace Harita.API.Services
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
                 throw new Exception("Şifre hatalı.");
 
-            return GenerateToken(user);
+            var permissionsJson = await BuildPermissionsJsonAsync(user);
+            return GenerateToken(user, permissionsJson);
         }
 
         public async Task<TokenDto> RegisterAsync(RegisterDto dto)
@@ -63,10 +65,55 @@ namespace Harita.API.Services
             await _context.Entry(user).Collection(u => u.UserRoles).Query()
                 .Include(ur => ur.Role).LoadAsync();
 
-            return GenerateToken(user);
+            var permissionsJson2 = await BuildPermissionsJsonAsync(user);
+            return GenerateToken(user, permissionsJson2);
         }
 
-        private TokenDto GenerateToken(User user)
+        private async Task<string> BuildPermissionsJsonAsync(User user)
+        {
+            // Admin/Manager → all permissions true; Staff → merge from groups
+            var roles = user.UserRoles?.Select(ur => ur.Role?.Name).Where(n => n != null).ToList() ?? new();
+            if (roles.Contains("Admin") || roles.Contains("Manager"))
+            {
+                var modules = new[] { "rehber", "gorev", "izin", "harc", "veriYukleme", "tevhid", "ozelSayfalar", "kullanicilar" };
+                var allTrue = modules.ToDictionary(m => m, m => new { view = true, edit = true });
+                return JsonSerializer.Serialize(allTrue);
+            }
+
+            // Staff: merge permissions from all assigned groups
+            var groups = await _context.UserPermissionGroups
+                .Where(upg => upg.UserId == user.Id)
+                .Include(upg => upg.PermissionGroup)
+                .Where(upg => !upg.PermissionGroup.IsDeleted)
+                .Select(upg => upg.PermissionGroup.Permissions)
+                .ToListAsync();
+
+            if (groups.Count == 0) return "{}";
+
+            var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var merged = new Dictionary<string, (bool view, bool edit)>();
+            foreach (var json in groups)
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, jsonOpts);
+                    if (dict == null) continue;
+                    foreach (var kv in dict)
+                    {
+                        var v = kv.Value.TryGetProperty("view", out var vp) && vp.GetBoolean();
+                        var e = kv.Value.TryGetProperty("edit", out var ep) && ep.GetBoolean();
+                        if (!merged.ContainsKey(kv.Key)) merged[kv.Key] = (v, e);
+                        else merged[kv.Key] = (merged[kv.Key].view || v, merged[kv.Key].edit || e);
+                    }
+                }
+                catch { }
+            }
+
+            var result = merged.ToDictionary(kv => kv.Key, kv => new { view = kv.Value.view, edit = kv.Value.edit });
+            return JsonSerializer.Serialize(result);
+        }
+
+        private TokenDto GenerateToken(User user, string permissionsJson = "{}")
         {
             var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "gizli_anahtar_en_az_32_karakter_olmali_12345");
             var issuer = _configuration["Jwt:Issuer"] ?? "HaritaAPI";
@@ -77,7 +124,8 @@ namespace Harita.API.Services
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Email),
                 new Claim("FullName", $"{user.Name} {user.Surname}"),
-                new Claim("Department", user.Department ?? "")
+                new Claim("Department", user.Department ?? ""),
+                new Claim("Permissions", permissionsJson)
             };
 
             // Rol claim'lerini ekle

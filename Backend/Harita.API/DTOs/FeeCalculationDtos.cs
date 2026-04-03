@@ -2,19 +2,20 @@ namespace Harita.API.DTOs
 {
     public class CreateFeeCalculationDto
     {
-        public string RuhsatTuru { get; set; } = string.Empty;
+        public string HarcTuru { get; set; } = string.Empty;
         public double AlanM2 { get; set; }
         public string Ada { get; set; } = string.Empty;
         public string Parsel { get; set; } = string.Empty;
         public string Mahalle { get; set; } = string.Empty;
         public string? MalikAdi { get; set; }
+        public string? PlanFonksiyonu { get; set; }
         public string? Notlar { get; set; }
     }
 
     public class FeeCalculationDto
     {
         public Guid Id { get; set; }
-        public string RuhsatTuru { get; set; } = string.Empty;
+        public string HarcTuru { get; set; } = string.Empty;
         public double AlanM2 { get; set; }
         public double BirimHarc { get; set; }
         public double ToplamHarc { get; set; }
@@ -22,6 +23,7 @@ namespace Harita.API.DTOs
         public string Parsel { get; set; } = string.Empty;
         public string Mahalle { get; set; } = string.Empty;
         public string? MalikAdi { get; set; }
+        public string? PlanFonksiyonu { get; set; }
         public string? Notlar { get; set; }
         public Guid HesaplayanKullaniciId { get; set; }
         public string HesaplayanKullanici { get; set; } = string.Empty;
@@ -32,7 +34,9 @@ namespace Harita.API.DTOs
     public class FeeRateDto
     {
         public Guid Id { get; set; }
-        public string RuhsatTuru { get; set; } = string.Empty;
+        public Guid? CategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public string HarcTuru { get; set; } = string.Empty;
         public double BirimHarc { get; set; }
         public double? Katsayi { get; set; }
         public string? Aciklama { get; set; }
@@ -42,7 +46,8 @@ namespace Harita.API.DTOs
 
     public class CreateFeeRateDto
     {
-        public required string RuhsatTuru { get; set; }
+        public Guid? CategoryId { get; set; }
+        public required string HarcTuru { get; set; }
         public double BirimHarc { get; set; }
         public double? Katsayi { get; set; }
         public string? Aciklama { get; set; }
@@ -52,5 +57,20 @@ namespace Harita.API.DTOs
     public class UpdateFeeRateDto : CreateFeeRateDto
     {
         public bool IsActive { get; set; } = true;
+    }
+
+    public class FeeCategoryDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int SiraNo { get; set; }
+    }
+
+    public class CreateFeeCategoryDto
+    {
+        public required string Name { get; set; }
+        public string? Description { get; set; }
+        public int SiraNo { get; set; } = 0;
     }
 }

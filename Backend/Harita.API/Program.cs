@@ -93,6 +93,10 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ILeaveService, LeaveService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IFeeCalculationService, FeeCalculationService>();
+builder.Services.AddScoped<ITevhidService, TevhidService>();
+builder.Services.AddScoped<IDynamicPageService, DynamicPageService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<IImarPlanService, ImarPlanService>();
 
 var app = builder.Build();
 

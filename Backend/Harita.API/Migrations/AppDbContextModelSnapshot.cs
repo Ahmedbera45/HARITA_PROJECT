@@ -44,12 +44,15 @@ namespace Harita.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("Priority")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Title")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -78,6 +81,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("FirstName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Institution")
@@ -87,6 +91,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("LastName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
@@ -100,6 +105,101 @@ namespace Harita.API.Migrations
                     b.ToTable("Contacts");
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.DynamicColumn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageId");
+
+                    b.ToTable("DynamicColumns");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.DynamicPage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ParcelMatching")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("DynamicPages");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.DynamicRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("PageId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageId");
+
+                    b.ToTable("DynamicRows");
+                });
+
             modelBuilder.Entity("Harita.API.Entities.FeeCalculation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -107,6 +207,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Ada")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<double>("AlanM2")
@@ -118,10 +219,15 @@ namespace Harita.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<string>("HarcTuru")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Mahalle")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("MalikAdi")
@@ -131,9 +237,10 @@ namespace Harita.API.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Parsel")
+                        .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RuhsatTuru")
+                    b.Property<string>("PlanFonksiyonu")
                         .HasColumnType("text");
 
                     b.Property<double>("ToplamHarc")
@@ -149,6 +256,33 @@ namespace Harita.API.Migrations
                     b.ToTable("FeeCalculations");
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.FeeCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SiraNo")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FeeCategories");
+                });
+
             modelBuilder.Entity("Harita.API.Entities.FeeRate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -161,8 +295,15 @@ namespace Harita.API.Migrations
                     b.Property<double>("BirimHarc")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("HarcTuru")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -173,15 +314,117 @@ namespace Harita.API.Migrations
                     b.Property<double?>("Katsayi")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("RuhsatTuru")
-                        .HasColumnType("text");
-
                     b.Property<int>("SiraNo")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.ToTable("FeeRates");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.ImarPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Aciklama")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Ada")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Durum")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Konu")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Mahalle")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OnayMakami")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("OnayTarihi")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Parsel")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanAdi")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanNo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanTuru")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("YuzolcumHa")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("ImarPlanlar");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.ImarPlanEk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Aciklama")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("DosyaAdi")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DosyaTuru")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DosyaYolu")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EkleyenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ImarPlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EkleyenId");
+
+                    b.HasIndex("ImarPlanId");
+
+                    b.ToTable("ImarPlanEkler");
                 });
 
             modelBuilder.Entity("Harita.API.Entities.ImportLog", b =>
@@ -191,6 +434,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("BatchId")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -203,6 +447,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("FileName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<Guid>("ImportedByUserId")
@@ -255,6 +500,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("LeaveType")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("ReviewNote")
@@ -270,6 +516,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
@@ -291,6 +538,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Ada")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<double?>("Alan")
@@ -299,6 +547,15 @@ namespace Harita.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<string>("EskiAda")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EskiParsel")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Geometry")
+                        .HasColumnType("text");
+
                     b.Property<string>("ImportBatchId")
                         .HasColumnType("text");
 
@@ -306,6 +563,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("Mahalle")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("MalikAdi")
@@ -321,6 +579,10 @@ namespace Harita.API.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Parsel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanFonksiyonu")
                         .HasColumnType("text");
 
                     b.Property<decimal?>("RayicBedel")
@@ -332,6 +594,34 @@ namespace Harita.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Parcels");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.PermissionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Permissions")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PermissionGroups");
                 });
 
             modelBuilder.Entity("Harita.API.Entities.Role", b =>
@@ -347,6 +637,7 @@ namespace Harita.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -367,6 +658,105 @@ namespace Harita.API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("TaskAssignments");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.TevhidCalculation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Ada")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<double>("ArsaHarc")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("ArsaM2")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("CekmelerHarc")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("CekmelerM2")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EskiAda")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EskiParsel")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<double>("Katsayi")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Mahalle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MalikAdi")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notlar")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("OnaylananHarc")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("OnaylananSenaryo")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ParcelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ParselNo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanFonksiyonu")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("RayicBedel")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ReviewNote")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<double>("TaksHarc")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("TaksM2")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ParcelId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.ToTable("TevhidCalculations");
                 });
 
             modelBuilder.Entity("Harita.API.Entities.User", b =>
@@ -404,6 +794,33 @@ namespace Harita.API.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.UserPermissionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("PermissionGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PermissionGroupId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserPermissionGroups");
+                });
+
             modelBuilder.Entity("UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -437,6 +854,39 @@ namespace Harita.API.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.DynamicColumn", b =>
+                {
+                    b.HasOne("Harita.API.Entities.DynamicPage", "Page")
+                        .WithMany("Columns")
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Page");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.DynamicPage", b =>
+                {
+                    b.HasOne("Harita.API.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.DynamicRow", b =>
+                {
+                    b.HasOne("Harita.API.Entities.DynamicPage", "Page")
+                        .WithMany("Rows")
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Page");
+                });
+
             modelBuilder.Entity("Harita.API.Entities.FeeCalculation", b =>
                 {
                     b.HasOne("Harita.API.Entities.User", "User")
@@ -446,6 +896,46 @@ namespace Harita.API.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.FeeRate", b =>
+                {
+                    b.HasOne("Harita.API.Entities.FeeCategory", "Category")
+                        .WithMany("FeeRates")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.ImarPlan", b =>
+                {
+                    b.HasOne("Harita.API.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.ImarPlanEk", b =>
+                {
+                    b.HasOne("Harita.API.Entities.User", "Ekleyen")
+                        .WithMany()
+                        .HasForeignKey("EkleyenId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harita.API.Entities.ImarPlan", "ImarPlan")
+                        .WithMany("Ekler")
+                        .HasForeignKey("ImarPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ekleyen");
+
+                    b.Navigation("ImarPlan");
                 });
 
             modelBuilder.Entity("Harita.API.Entities.ImportLog", b =>
@@ -496,6 +986,50 @@ namespace Harita.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.TevhidCalculation", b =>
+                {
+                    b.HasOne("Harita.API.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Harita.API.Entities.Parcel", "Parcel")
+                        .WithMany()
+                        .HasForeignKey("ParcelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Harita.API.Entities.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Parcel");
+
+                    b.Navigation("ReviewedByUser");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.UserPermissionGroup", b =>
+                {
+                    b.HasOne("Harita.API.Entities.PermissionGroup", "PermissionGroup")
+                        .WithMany("UserPermissionGroups")
+                        .HasForeignKey("PermissionGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Harita.API.Entities.User", "User")
+                        .WithMany("UserPermissionGroups")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PermissionGroup");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("UserRole", b =>
                 {
                     b.HasOne("Harita.API.Entities.Role", "Role")
@@ -520,6 +1054,28 @@ namespace Harita.API.Migrations
                     b.Navigation("Assignments");
                 });
 
+            modelBuilder.Entity("Harita.API.Entities.DynamicPage", b =>
+                {
+                    b.Navigation("Columns");
+
+                    b.Navigation("Rows");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.FeeCategory", b =>
+                {
+                    b.Navigation("FeeRates");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.ImarPlan", b =>
+                {
+                    b.Navigation("Ekler");
+                });
+
+            modelBuilder.Entity("Harita.API.Entities.PermissionGroup", b =>
+                {
+                    b.Navigation("UserPermissionGroups");
+                });
+
             modelBuilder.Entity("Harita.API.Entities.Role", b =>
                 {
                     b.Navigation("UserRoles");
@@ -528,6 +1084,8 @@ namespace Harita.API.Migrations
             modelBuilder.Entity("Harita.API.Entities.User", b =>
                 {
                     b.Navigation("CreatedAppTasks");
+
+                    b.Navigation("UserPermissionGroups");
 
                     b.Navigation("UserRoles");
                 });

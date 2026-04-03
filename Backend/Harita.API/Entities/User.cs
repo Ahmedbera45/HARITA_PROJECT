@@ -11,5 +11,6 @@ namespace Harita.API.Entities
 
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
         public ICollection<AppTask> CreatedAppTasks { get; set; } = new List<AppTask>();
+        public ICollection<UserPermissionGroup> UserPermissionGroups { get; set; } = new List<UserPermissionGroup>();
     }
 }

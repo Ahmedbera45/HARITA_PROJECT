@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Security.Claims;
 using System.Text.Json;
 using ClosedXML.Excel;
@@ -6,6 +7,7 @@ using Harita.API.DTOs;
 using Harita.API.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.IO;
 
 namespace Harita.API.Services
 {
@@ -106,19 +108,24 @@ namespace Harita.API.Services
                         rayicBedel = parsedRayic;
                 }
 
+                string? OptStr(string col) { var idx = GetColIdx(col); if (idx <= 0) return null; var v = r.Cell(idx).GetString().Trim(); return string.IsNullOrEmpty(v) ? null : v; }
+
                 parcels.Add(new Parcel
                 {
-                    Ada           = ada,
-                    Parsel        = parsel,
-                    Mahalle       = mah,
-                    Mevkii        = GetColIdx("Mevkii") > 0 ? r.Cell(GetColIdx("Mevkii")).GetString().Trim() : null,
-                    Alan          = alan,
-                    Nitelik       = GetColIdx("Nitelik") > 0 ? r.Cell(GetColIdx("Nitelik")).GetString().Trim() : null,
-                    MalikAdi      = GetColIdx("MalikAdi") > 0 ? r.Cell(GetColIdx("MalikAdi")).GetString().Trim() : null,
-                    PaftaNo       = GetColIdx("PaftaNo") > 0 ? r.Cell(GetColIdx("PaftaNo")).GetString().Trim() : null,
-                    RayicBedel    = rayicBedel,
-                    YolGenisligi  = GetColIdx("YolGenisligi") > 0 ? r.Cell(GetColIdx("YolGenisligi")).GetString().Trim() : null,
-                    ImportBatchId = batchId
+                    Ada             = ada,
+                    Parsel          = parsel,
+                    Mahalle         = mah,
+                    Mevkii          = OptStr("Mevkii"),
+                    Alan            = alan,
+                    Nitelik         = OptStr("Nitelik"),
+                    MalikAdi        = OptStr("MalikAdi"),
+                    PaftaNo         = OptStr("PaftaNo"),
+                    RayicBedel      = rayicBedel,
+                    YolGenisligi    = OptStr("YolGenisligi"),
+                    EskiAda         = OptStr("EskiAda"),
+                    EskiParsel      = OptStr("EskiParsel"),
+                    PlanFonksiyonu  = OptStr("PlanFonksiyonu"),
+                    ImportBatchId   = batchId
                 });
             }
 
@@ -185,17 +192,21 @@ namespace Harita.API.Services
                 .Select(p => new ParcelDto
                 {
                     Id            = p.Id,
-                    Ada           = p.Ada,
-                    Parsel        = p.Parsel,
-                    Mahalle       = p.Mahalle,
-                    Mevkii        = p.Mevkii,
-                    Alan          = p.Alan,
-                    Nitelik       = p.Nitelik,
-                    MalikAdi      = p.MalikAdi,
-                    PaftaNo       = p.PaftaNo,
-                    RayicBedel    = p.RayicBedel,
-                    YolGenisligi  = p.YolGenisligi,
-                    ImportBatchId = p.ImportBatchId
+                    Ada             = p.Ada,
+                    Parsel          = p.Parsel,
+                    Mahalle         = p.Mahalle,
+                    Mevkii          = p.Mevkii,
+                    Alan            = p.Alan,
+                    Nitelik         = p.Nitelik,
+                    MalikAdi        = p.MalikAdi,
+                    PaftaNo         = p.PaftaNo,
+                    RayicBedel      = p.RayicBedel,
+                    YolGenisligi    = p.YolGenisligi,
+                    EskiAda         = p.EskiAda,
+                    EskiParsel      = p.EskiParsel,
+                    PlanFonksiyonu  = p.PlanFonksiyonu,
+                    Geometry        = p.Geometry,
+                    ImportBatchId   = p.ImportBatchId
                 })
                 .ToListAsync();
         }
@@ -205,33 +216,198 @@ namespace Harita.API.Services
             var parcel = await _context.Parcels.FindAsync(id)
                 ?? throw new Exception("Parsel bulunamadı.");
 
-            parcel.Ada          = dto.Ada;
-            parcel.Parsel       = dto.Parsel;
-            parcel.Mahalle      = dto.Mahalle;
-            parcel.Mevkii       = dto.Mevkii;
-            parcel.Alan         = dto.Alan;
-            parcel.Nitelik      = dto.Nitelik;
-            parcel.MalikAdi     = dto.MalikAdi;
-            parcel.PaftaNo      = dto.PaftaNo;
-            parcel.RayicBedel   = dto.RayicBedel;
-            parcel.YolGenisligi = dto.YolGenisligi;
+            parcel.Ada             = dto.Ada;
+            parcel.Parsel          = dto.Parsel;
+            parcel.Mahalle         = dto.Mahalle;
+            parcel.Mevkii          = dto.Mevkii;
+            parcel.Alan            = dto.Alan;
+            parcel.Nitelik         = dto.Nitelik;
+            parcel.MalikAdi        = dto.MalikAdi;
+            parcel.PaftaNo         = dto.PaftaNo;
+            parcel.RayicBedel      = dto.RayicBedel;
+            parcel.YolGenisligi    = dto.YolGenisligi;
+            parcel.EskiAda         = dto.EskiAda;
+            parcel.EskiParsel      = dto.EskiParsel;
+            parcel.PlanFonksiyonu  = dto.PlanFonksiyonu;
 
             await _context.SaveChangesAsync();
 
             return new ParcelDto
             {
-                Id            = parcel.Id,
-                Ada           = parcel.Ada,
-                Parsel        = parcel.Parsel,
-                Mahalle       = parcel.Mahalle,
-                Mevkii        = parcel.Mevkii,
-                Alan          = parcel.Alan,
-                Nitelik       = parcel.Nitelik,
-                MalikAdi      = parcel.MalikAdi,
-                PaftaNo       = parcel.PaftaNo,
-                RayicBedel    = parcel.RayicBedel,
-                YolGenisligi  = parcel.YolGenisligi,
-                ImportBatchId = parcel.ImportBatchId
+                Id              = parcel.Id,
+                Ada             = parcel.Ada,
+                Parsel          = parcel.Parsel,
+                Mahalle         = parcel.Mahalle,
+                Mevkii          = parcel.Mevkii,
+                Alan            = parcel.Alan,
+                Nitelik         = parcel.Nitelik,
+                MalikAdi        = parcel.MalikAdi,
+                PaftaNo         = parcel.PaftaNo,
+                RayicBedel      = parcel.RayicBedel,
+                YolGenisligi    = parcel.YolGenisligi,
+                EskiAda         = parcel.EskiAda,
+                EskiParsel      = parcel.EskiParsel,
+                PlanFonksiyonu  = parcel.PlanFonksiyonu,
+                Geometry        = parcel.Geometry,
+                ImportBatchId   = parcel.ImportBatchId
+            };
+        }
+        public async Task<ParcelDto?> SearchParcelAsync(string ada, string parsel, string? mahalle = null)
+        {
+            var query = _context.Parcels
+                .Where(x => x.Ada == ada.Trim() && x.Parsel == parsel.Trim());
+
+            if (!string.IsNullOrWhiteSpace(mahalle))
+                query = query.Where(x => x.Mahalle == mahalle.Trim());
+
+            var p = await query.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+
+            if (p == null) return null;
+
+            return new ParcelDto
+            {
+                Id              = p.Id,
+                Ada             = p.Ada,
+                Parsel          = p.Parsel,
+                Mahalle         = p.Mahalle,
+                Mevkii          = p.Mevkii,
+                Alan            = p.Alan,
+                Nitelik         = p.Nitelik,
+                MalikAdi        = p.MalikAdi,
+                PaftaNo         = p.PaftaNo,
+                RayicBedel      = p.RayicBedel,
+                YolGenisligi    = p.YolGenisligi,
+                EskiAda         = p.EskiAda,
+                EskiParsel      = p.EskiParsel,
+                PlanFonksiyonu  = p.PlanFonksiyonu,
+                Geometry        = p.Geometry,
+                ImportBatchId   = p.ImportBatchId
+            };
+        }
+
+        public async Task<ImportResultDto> ImportParcelsFromShpAsync(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new Exception("Dosya boş veya seçilmemiş.");
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (ext != ".zip")
+                throw new Exception("SHP yüklemek için .zip formatında arşiv gereklidir (.shp, .dbf, .shx içermeli).");
+
+            var batchId = Guid.NewGuid().ToString("N")[..12].ToUpper();
+            var errors  = new List<string>();
+            var parcels = new List<Parcel>();
+
+            // ZIP'i geçici klasöre aç
+            var tmpDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tmpDir);
+
+            try
+            {
+                using var stream = new MemoryStream();
+                await file.CopyToAsync(stream);
+                stream.Position = 0;
+
+                using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
+                {
+                    foreach (var entry in zip.Entries)
+                        entry.ExtractToFile(Path.Combine(tmpDir, entry.Name), overwrite: true);
+                }
+
+                var shpFile = Directory.GetFiles(tmpDir, "*.shp").FirstOrDefault()
+                    ?? throw new Exception("ZIP içinde .shp dosyası bulunamadı.");
+
+                using var reader = new ShapefileDataReader(shpFile, NetTopologySuite.NtsGeometryServices.Instance.CreateGeometryFactory());
+                var dbase = reader.DbaseHeader;
+
+                // DBF sütun adlarını al (case-insensitive map)
+                var colMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < dbase.Fields.Length; i++)
+                    colMap[dbase.Fields[i].Name] = i + 1; // +1: index 0 = geometry
+
+                string? GetField(string name)
+                {
+                    if (!colMap.TryGetValue(name, out var idx)) return null;
+                    var val = reader.GetValue(idx)?.ToString()?.Trim();
+                    return string.IsNullOrEmpty(val) ? null : val;
+                }
+
+                int rowNum = 0;
+                while (reader.Read())
+                {
+                    rowNum++;
+                    var ada    = GetField("Ada");
+                    var parsel = GetField("Parsel");
+                    var mah    = GetField("Mahalle");
+
+                    if (string.IsNullOrEmpty(ada) || string.IsNullOrEmpty(parsel) || string.IsNullOrEmpty(mah))
+                    {
+                        errors.Add($"Satır {rowNum}: Ada, Parsel ve Mahalle alanları zorunludur.");
+                        continue;
+                    }
+
+                    double? alan = null;
+                    var alanStr = GetField("Alan");
+                    if (alanStr != null && double.TryParse(alanStr.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedAlan))
+                        alan = parsedAlan;
+
+                    decimal? rayic = null;
+                    var rayicStr = GetField("RayicBedel");
+                    if (rayicStr != null && decimal.TryParse(rayicStr.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedRayic))
+                        rayic = parsedRayic;
+
+                    string? wkt = null;
+                    try { wkt = reader.Geometry?.AsText(); } catch { }
+
+                    parcels.Add(new Parcel
+                    {
+                        Ada             = ada,
+                        Parsel          = parsel,
+                        Mahalle         = mah,
+                        Mevkii          = GetField("Mevkii"),
+                        Alan            = alan,
+                        Nitelik         = GetField("Nitelik"),
+                        MalikAdi        = GetField("MalikAdi"),
+                        PaftaNo         = GetField("PaftaNo"),
+                        RayicBedel      = rayic,
+                        YolGenisligi    = GetField("YolGenisligi"),
+                        EskiAda         = GetField("EskiAda"),
+                        EskiParsel      = GetField("EskiParsel"),
+                        PlanFonksiyonu  = GetField("PlanFonksiyonu"),
+                        Geometry        = wkt,
+                        ImportBatchId   = batchId
+                    });
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(tmpDir, recursive: true); } catch { }
+            }
+
+            if (parcels.Count > 0)
+                _context.Parcels.AddRange(parcels);
+
+            var log = new ImportLog
+            {
+                BatchId          = batchId,
+                FileName         = file.FileName,
+                TotalRows        = parcels.Count + errors.Count,
+                SuccessRows      = parcels.Count,
+                ErrorRows        = errors.Count,
+                ErrorDetails     = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null,
+                ImportedByUserId = GetCurrentUserId()
+            };
+            _context.ImportLogs.Add(log);
+            await _context.SaveChangesAsync();
+
+            return new ImportResultDto
+            {
+                BatchId     = batchId,
+                FileName    = file.FileName,
+                TotalRows   = log.TotalRows,
+                SuccessRows = log.SuccessRows,
+                ErrorRows   = log.ErrorRows,
+                Errors      = errors
             };
         }
     }

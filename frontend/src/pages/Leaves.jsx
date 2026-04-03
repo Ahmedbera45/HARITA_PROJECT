@@ -1,12 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Paper, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
   DialogContentText, Tooltip, Stack, Avatar, Switch, FormControlLabel,
-  Divider,
+  Divider, Tabs, Tab,
 } from '@mui/material';
-import { Add, Delete, CheckCircle, Cancel, HourglassEmpty, Schedule } from '@mui/icons-material';
+import { Add, Delete, CheckCircle, Cancel, HourglassEmpty, Schedule, CalendarMonth, List as ListIcon } from '@mui/icons-material';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+const localizer = dateFnsLocalizer({ format, parse, startOfWeek: (d) => startOfWeek(d, { weekStartsOn: 1 }), getDay, locales: { 'tr': tr } });
+
+const CAL_MESSAGES = {
+  allDay: 'Tüm gün', previous: 'Önceki', next: 'Sonraki', today: 'Bugün',
+  month: 'Ay', week: 'Hafta', day: 'Gün', agenda: 'Ajanda',
+  date: 'Tarih', time: 'Saat', event: 'Etkinlik', noEventsInRange: 'Bu aralıkta etkinlik yok.',
+};
 import { toast } from 'react-toastify';
 import leaveService from '../services/leaveService';
 import { useAuth } from '../hooks/useAuth';
@@ -45,6 +57,15 @@ export default function Leaves() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+
+  // Tab + Filtreler
+  const [tab, setTab] = useState(0);
+  const [filterPerson, setFilterPerson] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [calEventDetail, setCalEventDetail] = useState(null);
 
   const { isManager } = useAuth();
 
@@ -120,6 +141,37 @@ export default function Leaves() {
     ? Math.max(0, Math.floor((new Date(form.endDate) - new Date(form.startDate)) / 86400000) + 1)
     : 0;
 
+  const filteredLeaves = useMemo(() => {
+    return leaves.filter(l => {
+      if (filterPerson && !(l.userFullName || '').toLowerCase().includes(filterPerson.toLowerCase())) return false;
+      if (filterType && l.leaveType !== filterType) return false;
+      if (filterStatus && l.status !== filterStatus) return false;
+      if (filterDateFrom && new Date(l.startDate) < new Date(filterDateFrom)) return false;
+      if (filterDateTo) {
+        const to = new Date(filterDateTo);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(l.startDate) > to) return false;
+      }
+      return true;
+    });
+  }, [leaves, filterPerson, filterType, filterStatus, filterDateFrom, filterDateTo]);
+
+  const calendarEvents = useMemo(() => filteredLeaves
+    .filter(l => !l.isSaatlik && l.startDate)
+    .map(l => ({
+      id: l.id,
+      title: `${l.userFullName} — ${l.leaveType}`,
+      start: new Date(l.startDate),
+      end: new Date(l.endDate || l.startDate),
+      resource: l,
+    })), [filteredLeaves]);
+
+  const eventStyleGetter = (event) => {
+    const s = event.resource.status;
+    const bg = s === 'Onaylandı' ? '#4caf50' : s === 'Reddedildi' ? '#f44336' : '#ff9800';
+    return { style: { backgroundColor: bg, borderColor: bg, color: 'white', borderRadius: 4 } };
+  };
+
   const formatSure = (l) => {
     if (l.isSaatlik) {
       return (
@@ -150,7 +202,7 @@ export default function Leaves() {
       </Box>
 
       {/* Özet Chips */}
-      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         {['Bekliyor', 'Onaylandı', 'Reddedildi'].map(s => (
           <Chip
             key={s}
@@ -158,6 +210,8 @@ export default function Leaves() {
             color={STATUS_CHIP[s].color}
             variant="outlined"
             icon={STATUS_CHIP[s].icon}
+            onClick={() => setFilterStatus(filterStatus === s ? '' : s)}
+            sx={{ cursor: 'pointer', fontWeight: filterStatus === s ? 700 : 400 }}
           />
         ))}
         <Chip
@@ -168,7 +222,38 @@ export default function Leaves() {
         />
       </Stack>
 
-      {/* Tablo */}
+      {/* Filtre Çubuğu */}
+      <Paper sx={{ p: 1.5, mb: 2 }}>
+        <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
+          {isManager && (
+            <TextField size="small" label="Personel" value={filterPerson} onChange={e => setFilterPerson(e.target.value)} sx={{ width: 150 }} />
+          )}
+          <TextField select size="small" label="İzin Türü" value={filterType} onChange={e => setFilterType(e.target.value)} sx={{ width: 150 }}>
+            <MenuItem value="">Tümü</MenuItem>
+            {[...LEAVE_TYPES, 'Saatlik İzin'].map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Durum" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} sx={{ width: 150 }}>
+            {[{ v: '', l: 'Tümü' }, { v: 'Bekliyor', l: 'Bekliyor' }, { v: 'Onaylandı', l: 'Onaylandı' }, { v: 'Reddedildi', l: 'Reddedildi' }].map(({ v, l }) => (
+              <MenuItem key={v} value={v}>{l}</MenuItem>
+            ))}
+          </TextField>
+          <TextField size="small" label="Başlangıç" type="date" value={filterDateFrom}
+            onChange={e => setFilterDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+          <TextField size="small" label="Bitiş" type="date" value={filterDateTo}
+            onChange={e => setFilterDateTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+          <Button size="small" variant="text" onClick={() => { setFilterPerson(''); setFilterType(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); }}>
+            Temizle
+          </Button>
+        </Stack>
+      </Paper>
+
+      {/* Görünüm Sekmeleri */}
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label="Liste" icon={<ListIcon />} iconPosition="start" />
+        <Tab label="Takvim" icon={<CalendarMonth />} iconPosition="start" />
+      </Tabs>
+
+      {tab === 0 && (
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
         <Table>
           <TableHead>
@@ -185,9 +270,9 @@ export default function Leaves() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={7} align="center">Yükleniyor...</TableCell></TableRow>
-            ) : leaves.length === 0 ? (
+            ) : filteredLeaves.length === 0 ? (
               <TableRow><TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>Kayıt bulunamadı</TableCell></TableRow>
-            ) : leaves.map(l => (
+            ) : filteredLeaves.map(l => (
               <TableRow key={l.id} hover>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -250,6 +335,45 @@ export default function Leaves() {
           </TableBody>
         </Table>
       </TableContainer>
+      )}
+
+      {tab === 1 && (
+        <Paper sx={{ p: 2 }}>
+          <Box sx={{ height: 600 }}>
+            <Calendar
+              localizer={localizer}
+              events={calendarEvents}
+              startAccessor="start"
+              endAccessor="end"
+              eventPropGetter={eventStyleGetter}
+              messages={CAL_MESSAGES}
+              culture="tr"
+              onSelectEvent={event => setCalEventDetail(event.resource)}
+              style={{ height: '100%' }}
+            />
+          </Box>
+        </Paper>
+      )}
+
+      {/* ─── Takvim Etkinlik Detay Dialog ─── */}
+      <Dialog open={!!calEventDetail} onClose={() => setCalEventDetail(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>İzin Detayı</DialogTitle>
+        <DialogContent>
+          {calEventDetail && (
+            <Stack spacing={1} sx={{ mt: 0.5 }}>
+              <Typography><strong>Personel:</strong> {calEventDetail.userFullName}</Typography>
+              <Typography><strong>İzin Türü:</strong> {calEventDetail.leaveType}</Typography>
+              <Typography><strong>Başlangıç:</strong> {fmt(calEventDetail.startDate)}</Typography>
+              <Typography><strong>Bitiş:</strong> {fmt(calEventDetail.endDate)}</Typography>
+              <Chip label={calEventDetail.status} size="small" color={STATUS_CHIP[calEventDetail.status]?.color || 'default'} />
+              {calEventDetail.description && <Typography><strong>Açıklama:</strong> {calEventDetail.description}</Typography>}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCalEventDetail(null)}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ─── İzin Talebi Oluştur Dialog ─── */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>

@@ -7,8 +7,10 @@ import {
 } from '@mui/material';
 import {
   CloudUpload, History, Search, CheckCircle, Error as ErrorIcon,
-  TableChart, FileDownload, Edit as EditIcon,
+  TableChart, FileDownload, Edit as EditIcon, Map as MapIcon,
 } from '@mui/icons-material';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { toast } from 'react-toastify';
 import importService from '../services/importService';
 import { useAuth } from '../hooks/useAuth';
@@ -29,10 +31,12 @@ export default function Import() {
   const [tab, setTab] = useState(isManager ? 0 : 2);
 
   // Upload state
+  const [uploadMode, setUploadMode] = useState('excel'); // 'excel' | 'shp'
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const fileInputRef = useRef();
+  const shpInputRef = useRef();
 
   // Log state
   const [logs, setLogs] = useState([]);
@@ -81,11 +85,24 @@ export default function Import() {
     setLastResult(null);
   };
 
+  const handleShpChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (!f.name.match(/\.zip$/i)) {
+      toast.warning('SHP yükleme için .zip formatında arşiv gereklidir.');
+      return;
+    }
+    setFile(f);
+    setLastResult(null);
+  };
+
   const handleUpload = async () => {
     if (!file) { toast.warning('Önce dosya seçin.'); return; }
     setUploading(true);
     try {
-      const result = await importService.importParcels(file);
+      const result = uploadMode === 'shp'
+        ? await importService.importShp(file)
+        : await importService.importParcels(file);
       setLastResult(result);
       if (result.errorRows === 0) {
         toast.success(`${result.successRows} parsel başarıyla içe aktarıldı.`);
@@ -94,6 +111,7 @@ export default function Import() {
       }
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (shpInputRef.current) shpInputRef.current.value = '';
     } catch (e) {
       toast.error(e.response?.data || 'Yükleme başarısız.');
     } finally { setUploading(false); }
@@ -186,36 +204,66 @@ export default function Import() {
       {/* ─── TAB 0: YÜKLE ─── */}
       {tab === 0 && (
         <Stack spacing={3}>
+          {/* Format seçimi */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={600}>Format:</Typography>
+            <ToggleButtonGroup
+              value={uploadMode}
+              exclusive
+              onChange={(_, v) => { if (v) { setUploadMode(v); setFile(null); setLastResult(null); } }}
+              size="small"
+            >
+              <ToggleButton value="excel"><FileDownload sx={{ mr: 0.5, fontSize: 18 }} />Excel (.xlsx)</ToggleButton>
+              <ToggleButton value="shp"><MapIcon sx={{ mr: 0.5, fontSize: 18 }} />SHP (.zip)</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
           <Paper elevation={0} sx={{ p: 4, border: '2px dashed', borderColor: file ? 'primary.main' : 'divider', borderRadius: 3, textAlign: 'center' }}>
             <CloudUpload sx={{ fontSize: 56, color: file ? 'primary.main' : 'text.disabled', mb: 1 }} />
             <Typography variant="h6" gutterBottom>
-              {file ? file.name : 'Excel Dosyası Seçin'}
+              {file ? file.name : (uploadMode === 'shp' ? 'SHP Arşivi Seçin (.zip)' : 'Excel Dosyası Seçin')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {file ? `${(file.size / 1024).toFixed(1)} KB` : '.xlsx veya .xls — maksimum 10 MB'}
+              {file
+                ? `${(file.size / 1024).toFixed(1)} KB`
+                : uploadMode === 'shp'
+                  ? '.zip — .shp, .dbf, .shx içermeli — maksimum 50 MB'
+                  : '.xlsx veya .xls — maksimum 10 MB'}
             </Typography>
             <Stack direction="row" spacing={2} justifyContent="center">
-              <Button variant="outlined" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Button variant="outlined"
+                onClick={() => uploadMode === 'shp' ? shpInputRef.current?.click() : fileInputRef.current?.click()}
+                disabled={uploading}>
                 Dosya Seç
               </Button>
               <Button variant="contained" onClick={handleUpload} disabled={!file || uploading} startIcon={<CloudUpload />}>
                 {uploading ? 'Yükleniyor...' : 'İçe Aktar'}
               </Button>
-              <Tooltip title="CSV formatında şablon indir">
-                <Button variant="text" startIcon={<FileDownload />} onClick={downloadTemplate}>
-                  Şablon
-                </Button>
-              </Tooltip>
+              {uploadMode === 'excel' && (
+                <Tooltip title="Excel şablonu indir">
+                  <Button variant="text" startIcon={<FileDownload />} onClick={downloadTemplate}>
+                    Şablon
+                  </Button>
+                </Tooltip>
+              )}
             </Stack>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
+            <input ref={shpInputRef} type="file" accept=".zip" hidden onChange={handleShpChange} />
             {uploading && <LinearProgress sx={{ mt: 2 }} />}
           </Paper>
 
-          <Alert severity="info" sx={{ borderRadius: 2 }}>
-            <strong>Excel sütun başlıkları (zorunlu: Ada, Parsel, Mahalle):</strong><br />
-            Ada | Parsel | Mahalle | Mevkii | Alan (m²) | Nitelik | MalikAdi | PaftaNo | RayicBedel | <strong>YolGenisligi</strong>
-            <br /><Typography variant="caption" color="text.secondary">Örn: YolGenisligi → "15+", "10-15", "7m"</Typography>
-          </Alert>
+          {uploadMode === 'excel' ? (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              <strong>Excel sütun başlıkları (zorunlu: Ada, Parsel, Mahalle):</strong><br />
+              Ada | Parsel | Mahalle | Mevkii | Alan | Nitelik | MalikAdi | PaftaNo | RayicBedel | YolGenisligi | <strong>EskiAda</strong> | <strong>EskiParsel</strong>
+            </Alert>
+          ) : (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              <strong>SHP ZIP içeriği:</strong> .shp, .dbf, .shx dosyaları zorunlu.<br />
+              DBF sütun adları: Ada, Parsel, Mahalle, Mevkii, Alan, Nitelik, MalikAdi, PaftaNo, RayicBedel, YolGenisligi, EskiAda, EskiParsel<br />
+              <Typography variant="caption" color="text.secondary">Geometri otomatik olarak WKT formatında kaydedilir.</Typography>
+            </Alert>
+          )}
 
           {lastResult && (
             <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: lastResult.errorRows > 0 ? 'warning.main' : 'success.main', borderRadius: 2 }}>

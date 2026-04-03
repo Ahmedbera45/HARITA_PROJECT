@@ -29,29 +29,34 @@ namespace Harita.API.Services
         public async Task<List<FeeRateDto>> GetFeeRatesAsync()
         {
             return await _context.FeeRates
+                .Include(r => r.Category)
                 .Where(r => !r.IsDeleted)
-                .OrderBy(r => r.SiraNo).ThenBy(r => r.RuhsatTuru)
+                .OrderBy(r => r.Category != null ? r.Category.SiraNo : int.MaxValue)
+                .ThenBy(r => r.SiraNo).ThenBy(r => r.HarcTuru)
                 .Select(r => new FeeRateDto
                 {
-                    Id         = r.Id,
-                    RuhsatTuru = r.RuhsatTuru,
-                    BirimHarc  = r.BirimHarc,
-                    Katsayi    = r.Katsayi,
-                    Aciklama   = r.Aciklama,
-                    IsActive   = r.IsActive,
-                    SiraNo     = r.SiraNo
+                    Id           = r.Id,
+                    CategoryId   = r.CategoryId,
+                    CategoryName = r.Category != null ? r.Category.Name : null,
+                    HarcTuru     = r.HarcTuru,
+                    BirimHarc    = r.BirimHarc,
+                    Katsayi      = r.Katsayi,
+                    Aciklama     = r.Aciklama,
+                    IsActive     = r.IsActive,
+                    SiraNo       = r.SiraNo
                 })
                 .ToListAsync();
         }
 
         public async Task<FeeRateDto> CreateFeeRateAsync(CreateFeeRateDto dto)
         {
-            if (await _context.FeeRates.AnyAsync(r => r.RuhsatTuru == dto.RuhsatTuru && !r.IsDeleted))
-                throw new Exception("Bu ruhsat türü zaten mevcut.");
+            if (await _context.FeeRates.AnyAsync(r => r.HarcTuru == dto.HarcTuru && !r.IsDeleted))
+                throw new Exception("Bu harç türü zaten mevcut.");
 
             var rate = new FeeRate
             {
-                RuhsatTuru = dto.RuhsatTuru,
+                CategoryId = dto.CategoryId,
+                HarcTuru   = dto.HarcTuru,
                 BirimHarc  = dto.BirimHarc,
                 Katsayi    = dto.Katsayi,
                 Aciklama   = dto.Aciklama,
@@ -60,8 +65,8 @@ namespace Harita.API.Services
             };
             _context.FeeRates.Add(rate);
             await _context.SaveChangesAsync();
-
-            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Katsayi = rate.Katsayi, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
+            await _context.Entry(rate).Reference(r => r.Category).LoadAsync();
+            return MapRateToDto(rate);
         }
 
         public async Task<FeeRateDto> UpdateFeeRateAsync(Guid id, UpdateFeeRateDto dto)
@@ -69,15 +74,16 @@ namespace Harita.API.Services
             var rate = await _context.FeeRates.FindAsync(id)
                 ?? throw new Exception("Harç kalemi bulunamadı.");
 
-            rate.RuhsatTuru = dto.RuhsatTuru;
+            rate.CategoryId = dto.CategoryId;
+            rate.HarcTuru   = dto.HarcTuru;
             rate.BirimHarc  = dto.BirimHarc;
             rate.Katsayi    = dto.Katsayi;
             rate.Aciklama   = dto.Aciklama;
             rate.IsActive   = dto.IsActive;
             rate.SiraNo     = dto.SiraNo;
             await _context.SaveChangesAsync();
-
-            return new FeeRateDto { Id = rate.Id, RuhsatTuru = rate.RuhsatTuru, BirimHarc = rate.BirimHarc, Katsayi = rate.Katsayi, Aciklama = rate.Aciklama, IsActive = rate.IsActive, SiraNo = rate.SiraNo };
+            await _context.Entry(rate).Reference(r => r.Category).LoadAsync();
+            return MapRateToDto(rate);
         }
 
         public async Task<bool> DeleteFeeRateAsync(Guid id)
@@ -89,13 +95,65 @@ namespace Harita.API.Services
             return true;
         }
 
+        // ─── Harç Kategorileri ──────────────────────────────────────────────
+
+        public async Task<List<FeeCategoryDto>> GetCategoriesAsync()
+        {
+            return await _context.FeeCategories
+                .Where(c => !c.IsDeleted)
+                .OrderBy(c => c.SiraNo).ThenBy(c => c.Name)
+                .Select(c => new FeeCategoryDto { Id = c.Id, Name = c.Name, Description = c.Description, SiraNo = c.SiraNo })
+                .ToListAsync();
+        }
+
+        public async Task<FeeCategoryDto> CreateCategoryAsync(CreateFeeCategoryDto dto)
+        {
+            var cat = new FeeCategory { Name = dto.Name, Description = dto.Description, SiraNo = dto.SiraNo };
+            _context.FeeCategories.Add(cat);
+            await _context.SaveChangesAsync();
+            return new FeeCategoryDto { Id = cat.Id, Name = cat.Name, Description = cat.Description, SiraNo = cat.SiraNo };
+        }
+
+        public async Task<FeeCategoryDto> UpdateCategoryAsync(Guid id, CreateFeeCategoryDto dto)
+        {
+            var cat = await _context.FeeCategories.FindAsync(id)
+                ?? throw new Exception("Kategori bulunamadı.");
+            cat.Name = dto.Name;
+            cat.Description = dto.Description;
+            cat.SiraNo = dto.SiraNo;
+            await _context.SaveChangesAsync();
+            return new FeeCategoryDto { Id = cat.Id, Name = cat.Name, Description = cat.Description, SiraNo = cat.SiraNo };
+        }
+
+        public async Task<bool> DeleteCategoryAsync(Guid id)
+        {
+            var cat = await _context.FeeCategories.FindAsync(id);
+            if (cat == null) return false;
+            cat.IsDeleted = true;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        private static FeeRateDto MapRateToDto(FeeRate r) => new()
+        {
+            Id           = r.Id,
+            CategoryId   = r.CategoryId,
+            CategoryName = r.Category?.Name,
+            HarcTuru     = r.HarcTuru,
+            BirimHarc    = r.BirimHarc,
+            Katsayi      = r.Katsayi,
+            Aciklama     = r.Aciklama,
+            IsActive     = r.IsActive,
+            SiraNo       = r.SiraNo
+        };
+
         // ─── Harç Hesaplama ─────────────────────────────────────────────────
 
         public async Task<FeeCalculationDto> CalculateAsync(CreateFeeCalculationDto dto)
         {
             var rate = await _context.FeeRates
-                .FirstOrDefaultAsync(r => r.RuhsatTuru == dto.RuhsatTuru && r.IsActive && !r.IsDeleted)
-                ?? throw new Exception($"Geçersiz veya pasif ruhsat türü: {dto.RuhsatTuru}");
+                .FirstOrDefaultAsync(r => r.HarcTuru == dto.HarcTuru && r.IsActive && !r.IsDeleted)
+                ?? throw new Exception($"Geçersiz veya pasif ruhsat türü: {dto.HarcTuru}");
 
             if (dto.AlanM2 <= 0)
                 throw new Exception("Alan değeri sıfırdan büyük olmalıdır.");
@@ -105,7 +163,7 @@ namespace Harita.API.Services
             var entity = new FeeCalculation
             {
                 UserId     = userId,
-                RuhsatTuru = dto.RuhsatTuru,
+                HarcTuru = dto.HarcTuru,
                 AlanM2     = dto.AlanM2,
                 BirimHarc  = rate.BirimHarc,
                 ToplamHarc = Math.Round(dto.AlanM2 * rate.BirimHarc * carpan, 2),
@@ -113,6 +171,7 @@ namespace Harita.API.Services
                 Parsel     = dto.Parsel,
                 Mahalle    = dto.Mahalle,
                 MalikAdi   = dto.MalikAdi,
+                PlanFonksiyonu = dto.PlanFonksiyonu,
                 Notlar     = dto.Notlar,
                 CreatedAt  = DateTime.UtcNow
             };
@@ -154,7 +213,7 @@ namespace Harita.API.Services
         private static FeeCalculationDto MapToDto(FeeCalculation f, User? user) => new()
         {
             Id                       = f.Id,
-            RuhsatTuru               = f.RuhsatTuru,
+            HarcTuru               = f.HarcTuru,
             AlanM2                   = f.AlanM2,
             BirimHarc                = f.BirimHarc,
             ToplamHarc               = f.ToplamHarc,
@@ -162,6 +221,7 @@ namespace Harita.API.Services
             Parsel                   = f.Parsel,
             Mahalle                  = f.Mahalle,
             MalikAdi                 = f.MalikAdi,
+            PlanFonksiyonu           = f.PlanFonksiyonu,
             Notlar                   = f.Notlar,
             HesaplayanKullaniciId    = f.UserId,
             HesaplayanKullanici      = user != null ? $"{user.Name} {user.Surname}" : "",

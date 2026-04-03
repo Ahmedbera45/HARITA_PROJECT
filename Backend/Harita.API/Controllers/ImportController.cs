@@ -26,7 +26,7 @@ namespace Harita.API.Controllers
             var ws = wb.Worksheets.Add("Parseller");
 
             // Başlık satırı
-            var headers = new[] { "Ada", "Parsel", "Mahalle", "Mevkii", "Alan", "Nitelik", "MalikAdi", "PaftaNo", "RayicBedel", "YolGenisligi" };
+            var headers = new[] { "Ada", "Parsel", "Mahalle", "Mevkii", "Alan", "Nitelik", "MalikAdi", "PaftaNo", "RayicBedel", "YolGenisligi", "EskiAda", "EskiParsel", "PlanFonksiyonu" };
             for (int i = 0; i < headers.Length; i++)
             {
                 var cell = ws.Cell(1, i + 1);
@@ -37,9 +37,9 @@ namespace Harita.API.Controllers
             }
 
             // Örnek satırlar
-            ws.Cell(2, 1).Value = "100"; ws.Cell(2, 2).Value = "1";  ws.Cell(2, 3).Value = "Merkez";      ws.Cell(2, 4).Value = "Aşağı Mah."; ws.Cell(2, 5).Value = 500;    ws.Cell(2, 6).Value = "Arsa";  ws.Cell(2, 7).Value = "Ali Veli";  ws.Cell(2, 8).Value = "10-B"; ws.Cell(2, 9).Value = 250000; ws.Cell(2, 10).Value = "15+";
-            ws.Cell(3, 1).Value = "200"; ws.Cell(3, 2).Value = "5";  ws.Cell(3, 3).Value = "Fatih";       ws.Cell(3, 4).Value = "Yukarı Mah."; ws.Cell(3, 5).Value = 320;   ws.Cell(3, 6).Value = "Konut"; ws.Cell(3, 7).Value = "Ayşe Kaya"; ws.Cell(3, 8).Value = "12-C"; ws.Cell(3, 9).Value = 180000; ws.Cell(3, 10).Value = "10-15";
-            ws.Cell(4, 1).Value = "305"; ws.Cell(4, 2).Value = "12"; ws.Cell(4, 3).Value = "Cumhuriyet"; ws.Cell(4, 4).Value = "";            ws.Cell(4, 5).Value = 750;    ws.Cell(4, 6).Value = "Tarla"; ws.Cell(4, 7).Value = "";          ws.Cell(4, 8).Value = "8-A";  ws.Cell(4, 9).Value = "";     ws.Cell(4, 10).Value = "7m";
+            ws.Cell(2, 1).Value = "100"; ws.Cell(2, 2).Value = "1";  ws.Cell(2, 3).Value = "Merkez";      ws.Cell(2, 4).Value = "Aşağı Mah."; ws.Cell(2, 5).Value = 500;  ws.Cell(2, 6).Value = "Arsa";  ws.Cell(2, 7).Value = "Ali Veli";  ws.Cell(2, 8).Value = "10-B"; ws.Cell(2, 9).Value = 250000; ws.Cell(2, 10).Value = "15+";  ws.Cell(2, 11).Value = "95";  ws.Cell(2, 12).Value = "3";
+            ws.Cell(3, 1).Value = "200"; ws.Cell(3, 2).Value = "5";  ws.Cell(3, 3).Value = "Fatih";       ws.Cell(3, 4).Value = "Yukarı Mah."; ws.Cell(3, 5).Value = 320; ws.Cell(3, 6).Value = "Konut"; ws.Cell(3, 7).Value = "Ayşe Kaya"; ws.Cell(3, 8).Value = "12-C"; ws.Cell(3, 9).Value = 180000; ws.Cell(3, 10).Value = "10-15"; ws.Cell(3, 11).Value = "";    ws.Cell(3, 12).Value = "";
+            ws.Cell(4, 1).Value = "305"; ws.Cell(4, 2).Value = "12"; ws.Cell(4, 3).Value = "Cumhuriyet"; ws.Cell(4, 4).Value = "";            ws.Cell(4, 5).Value = 750;  ws.Cell(4, 6).Value = "Tarla"; ws.Cell(4, 7).Value = "";          ws.Cell(4, 8).Value = "8-A";  ws.Cell(4, 9).Value = "";     ws.Cell(4, 10).Value = "7m";   ws.Cell(4, 11).Value = "300"; ws.Cell(4, 12).Value = "11";
 
             ws.Columns().AdjustToContents();
 
@@ -50,6 +50,32 @@ namespace Harita.API.Controllers
             return File(stream.ToArray(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "parsel_sablonu.xlsx");
+        }
+
+        /// <summary>Ada + Parsel ile veritabanında parsel ara</summary>
+        [HttpGet("parcels/search")]
+        public async Task<IActionResult> SearchParcel([FromQuery] string ada, [FromQuery] string parsel, [FromQuery] string? mahalle)
+        {
+            var result = await _importService.SearchParcelAsync(ada, parsel, mahalle);
+            if (result == null) return NotFound(new { message = "Parsel bulunamadı." });
+            return Ok(result);
+        }
+
+        /// <summary>SHP (ZIP) dosyasından parsel verisi içe aktar (Admin/Manager)</summary>
+        [HttpPost("parcels/shp")]
+        [Authorize(Roles = "Admin,Manager")]
+        [RequestSizeLimit(50 * 1024 * 1024)]
+        public async Task<IActionResult> ImportShp(IFormFile file)
+        {
+            try
+            {
+                var result = await _importService.ImportParcelsFromShpAsync(file);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         /// <summary>Excel dosyasından parsel verisi içe aktar (Admin/Manager)</summary>

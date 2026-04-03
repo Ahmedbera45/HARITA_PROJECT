@@ -4,7 +4,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
   Alert, Chip, Divider, IconButton, Tooltip, Switch, FormControlLabel,
-  Stack,
+  Stack, ListSubheader, Select, FormControl, InputLabel,
 } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -13,7 +13,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SearchIcon from '@mui/icons-material/Search';
 import feeService from '../services/feeService';
+import importService from '../services/importService';
 import { useAuth } from '../hooks/useAuth';
 
 const formatCurrency = (val) =>
@@ -22,12 +24,14 @@ const formatCurrency = (val) =>
 const formatDate = (d) =>
   new Date(d).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
-const EMPTY_RATE_FORM = { ruhsatTuru: '', birimHarc: '', katsayi: '', aciklama: '', siraNo: 0, isActive: true };
+const EMPTY_RATE_FORM = { categoryId: '', harcTuru: '', birimHarc: '', katsayi: '', aciklama: '', siraNo: 0, isActive: true };
+const EMPTY_CAT_FORM = { name: '', description: '', siraNo: 0 };
 
 export default function FeeCalculation() {
   const { isManager } = useAuth();
 
   const [rates, setRates] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [histLoading, setHistLoading] = useState(true);
@@ -35,7 +39,7 @@ export default function FeeCalculation() {
   const [success, setSuccess] = useState('');
 
   const [form, setForm] = useState({
-    ruhsatTuru: '', alanM2: '', ada: '', parsel: '', mahalle: '', malikAdi: '', notlar: '',
+    harcTuru: '', alanM2: '', ada: '', parsel: '', mahalle: '', malikAdi: '', planFonksiyonu: '', notlar: '',
   });
 
   const [preview, setPreview] = useState(null);
@@ -51,16 +55,37 @@ export default function FeeCalculation() {
   const [rateError, setRateError] = useState('');
   const [rateDeleteDialog, setRateDeleteDialog] = useState({ open: false, id: null });
 
+  // Harç kategorisi yönetimi
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [catEditId, setCatEditId] = useState(null);
+  const [catForm, setCatForm] = useState(EMPTY_CAT_FORM);
+  const [catSaving, setCatSaving] = useState(false);
+  const [catError, setCatError] = useState('');
+  const [catDeleteDialog, setCatDeleteDialog] = useState({ open: false, id: null });
+
+  // Parsel arama
+  const [searchAda, setSearchAda] = useState('');
+  const [searchParsel, setSearchParsel] = useState('');
+  const [searchMahalle, setSearchMahalle] = useState('');
+  const [searching, setSearching] = useState(false);
+
   const printRef = useRef();
 
   useEffect(() => {
     loadRates();
+    loadCategories();
     loadHistory();
   }, []);
 
   const loadRates = () => {
     feeService.getRates()
       .then(setRates)
+      .catch(() => {});
+  };
+
+  const loadCategories = () => {
+    feeService.getCategories()
+      .then(setCategories)
       .catch(() => {});
   };
 
@@ -73,7 +98,7 @@ export default function FeeCalculation() {
   };
 
   const activeRates = rates.filter(r => r.isActive);
-  const selectedRate = activeRates.find(r => r.ruhsatTuru === form.ruhsatTuru);
+  const selectedRate = activeRates.find(r => r.harcTuru === form.harcTuru);
   const katsayi = selectedRate?.katsayi ?? 1;
   const previewAmount =
     selectedRate && parseFloat(form.alanM2) > 0
@@ -83,29 +108,56 @@ export default function FeeCalculation() {
   const handleCalculate = async () => {
     setError('');
     setSuccess('');
-    if (!form.ruhsatTuru || !form.alanM2 || !form.ada || !form.parsel || !form.mahalle) {
-      setError('Ruhsat Türü, Alan, Ada, Parsel ve Mahalle zorunlu alanlardır.');
+    if (!form.harcTuru || !form.alanM2 || !form.ada || !form.parsel || !form.mahalle) {
+      setError('Harç Türü, Alan, Ada, Parsel ve Mahalle zorunlu alanlardır.');
       return;
     }
     setLoading(true);
     try {
       const data = await feeService.calculate({
-        ruhsatTuru: form.ruhsatTuru,
+        harcTuru: form.harcTuru,
         alanM2: parseFloat(form.alanM2),
         ada: form.ada,
         parsel: form.parsel,
         mahalle: form.mahalle,
         malikAdi: form.malikAdi || null,
+        planFonksiyonu: form.planFonksiyonu || null,
         notlar: form.notlar || null,
       });
       setPreview(data);
       setSuccess('Harç hesaplaması başarıyla kaydedildi.');
-      setForm({ ruhsatTuru: '', alanM2: '', ada: '', parsel: '', mahalle: '', malikAdi: '', notlar: '' });
+      setForm({ harcTuru: '', alanM2: '', ada: '', parsel: '', mahalle: '', malikAdi: '', planFonksiyonu: '', notlar: '' });
       loadHistory();
     } catch (e) {
       setError(e.response?.data?.message || 'Hesaplama sırasında hata oluştu.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleParcelSearch = async () => {
+    if (!searchAda.trim() || !searchParsel.trim()) {
+      setError('Ada ve Parsel numarası giriniz.');
+      return;
+    }
+    setSearching(true);
+    setError('');
+    try {
+      const p = await importService.searchParcel(searchAda.trim(), searchParsel.trim(), searchMahalle.trim() || undefined);
+      setForm(prev => ({
+        ...prev,
+        ada: p.ada,
+        parsel: p.parsel,
+        mahalle: p.mahalle,
+        malikAdi: p.malikAdi || '',
+        planFonksiyonu: p.planFonksiyonu || '',
+        alanM2: p.alan != null ? String(p.alan) : prev.alanM2,
+      }));
+      setSuccess('Parsel bilgileri getirildi.');
+    } catch {
+      setError('Parsel bulunamadı. Bilgileri manuel girebilirsiniz.');
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -140,7 +192,8 @@ export default function FeeCalculation() {
   const openEditRate = (rate) => {
     setRateEditId(rate.id);
     setRateForm({
-      ruhsatTuru: rate.ruhsatTuru,
+      categoryId: rate.categoryId || '',
+      harcTuru: rate.harcTuru,
       birimHarc: rate.birimHarc,
       katsayi: rate.katsayi != null ? rate.katsayi : '',
       aciklama: rate.aciklama || '',
@@ -152,15 +205,16 @@ export default function FeeCalculation() {
   };
 
   const handleSaveRate = async () => {
-    if (!rateForm.ruhsatTuru.trim() || !rateForm.birimHarc) {
-      setRateError('Ruhsat Türü ve Birim Harç zorunludur.');
+    if (!rateForm.harcTuru.trim() || !rateForm.birimHarc) {
+      setRateError('Harç Türü ve Birim Harç zorunludur.');
       return;
     }
     setRateSaving(true);
     setRateError('');
     try {
       const payload = {
-        ruhsatTuru: rateForm.ruhsatTuru,
+        categoryId: rateForm.categoryId || null,
+        harcTuru: rateForm.harcTuru,
         birimHarc: parseFloat(rateForm.birimHarc),
         katsayi: rateForm.katsayi !== '' ? parseFloat(rateForm.katsayi) : null,
         aciklama: rateForm.aciklama || null,
@@ -191,6 +245,53 @@ export default function FeeCalculation() {
     }
   };
 
+  // ── Kategori Yönetimi ──────────────────────────────────────────────
+  const openCreateCat = () => {
+    setCatEditId(null);
+    setCatForm(EMPTY_CAT_FORM);
+    setCatError('');
+    setCatDialogOpen(true);
+  };
+
+  const openEditCat = (cat) => {
+    setCatEditId(cat.id);
+    setCatForm({ name: cat.name, description: cat.description || '', siraNo: cat.siraNo });
+    setCatError('');
+    setCatDialogOpen(true);
+  };
+
+  const handleSaveCat = async () => {
+    if (!catForm.name.trim()) { setCatError('Kategori adı zorunludur.'); return; }
+    setCatSaving(true);
+    setCatError('');
+    try {
+      const payload = { name: catForm.name, description: catForm.description || null, siraNo: parseInt(catForm.siraNo) || 0 };
+      if (catEditId) {
+        await feeService.updateCategory(catEditId, payload);
+      } else {
+        await feeService.createCategory(payload);
+      }
+      setCatDialogOpen(false);
+      loadCategories();
+      loadRates();
+    } catch (e) {
+      setCatError(e.response?.data?.message || 'İşlem başarısız.');
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  const handleDeleteCat = async () => {
+    try {
+      await feeService.deleteCategory(catDeleteDialog.id);
+      setCatDeleteDialog({ open: false, id: null });
+      loadCategories();
+      loadRates();
+    } catch {
+      setError('Kategori silinemedi.');
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={3}>
@@ -206,22 +307,91 @@ export default function FeeCalculation() {
             {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-            <TextField
-              select fullWidth label="Ruhsat Türü" value={form.ruhsatTuru}
-              onChange={e => setForm(p => ({ ...p, ruhsatTuru: e.target.value }))}
-              sx={{ mb: 2 }}
-            >
-              {activeRates.map(r => (
-                <MenuItem key={r.id} value={r.ruhsatTuru}>
-                  <Box>
-                    <Typography variant="body2">{r.ruhsatTuru}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {r.birimHarc} TL/m²
-                    </Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </TextField>
+            {/* Parselden Getir */}
+            <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
+                Parselden Otomatik Getir
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <TextField size="small" label="Ada" value={searchAda}
+                  onChange={e => setSearchAda(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
+                  sx={{ width: 80 }} />
+                <TextField size="small" label="Parsel" value={searchParsel}
+                  onChange={e => setSearchParsel(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
+                  sx={{ width: 80 }} />
+                <TextField size="small" label="Mahalle (opsiyonel)" value={searchMahalle}
+                  onChange={e => setSearchMahalle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
+                  sx={{ width: 160 }} />
+                <Button size="small" variant="contained" color="secondary"
+                  startIcon={searching ? null : <SearchIcon />}
+                  onClick={handleParcelSearch} disabled={searching} sx={{ whiteSpace: 'nowrap' }}>
+                  {searching ? 'Aranıyor...' : 'Getir'}
+                </Button>
+              </Stack>
+            </Paper>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Harç Türü</InputLabel>
+              <Select
+                label="Harç Türü"
+                value={form.harcTuru}
+                onChange={e => setForm(p => ({ ...p, harcTuru: e.target.value }))}
+              >
+                {categories.length === 0
+                  ? activeRates.map(r => (
+                      <MenuItem key={r.id} value={r.harcTuru}>
+                        <Box>
+                          <Typography variant="body2">{r.harcTuru}</Typography>
+                          <Typography variant="caption" color="text.secondary">{r.birimHarc} TL/m²</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))
+                  : (() => {
+                      const items = [];
+                      // Kategorili olanlar
+                      const sortedCats = [...categories].sort((a, b) => a.siraNo - b.siraNo);
+                      sortedCats.forEach(cat => {
+                        const catRates = activeRates.filter(r => r.categoryId === cat.id);
+                        if (catRates.length === 0) return;
+                        items.push(
+                          <ListSubheader key={`cat-${cat.id}`} sx={{ fontWeight: 700, color: 'primary.main', bgcolor: 'grey.50' }}>
+                            {cat.name}
+                          </ListSubheader>
+                        );
+                        catRates.forEach(r => items.push(
+                          <MenuItem key={r.id} value={r.harcTuru} sx={{ pl: 3 }}>
+                            <Box>
+                              <Typography variant="body2">{r.harcTuru}</Typography>
+                              <Typography variant="caption" color="text.secondary">{r.birimHarc} TL/m²</Typography>
+                            </Box>
+                          </MenuItem>
+                        ));
+                      });
+                      // Kategorisiz olanlar
+                      const uncategorized = activeRates.filter(r => !r.categoryId);
+                      if (uncategorized.length > 0) {
+                        items.push(
+                          <ListSubheader key="cat-none" sx={{ fontWeight: 700, color: 'text.secondary', bgcolor: 'grey.50' }}>
+                            Diğer
+                          </ListSubheader>
+                        );
+                        uncategorized.forEach(r => items.push(
+                          <MenuItem key={r.id} value={r.harcTuru} sx={{ pl: 3 }}>
+                            <Box>
+                              <Typography variant="body2">{r.harcTuru}</Typography>
+                              <Typography variant="caption" color="text.secondary">{r.birimHarc} TL/m²</Typography>
+                            </Box>
+                          </MenuItem>
+                        ));
+                      }
+                      return items;
+                    })()
+                }
+              </Select>
+            </FormControl>
 
             <TextField
               fullWidth type="number" label="Alan (m²)" value={form.alanM2}
@@ -246,6 +416,10 @@ export default function FeeCalculation() {
 
             <TextField fullWidth label="Malik Adı (opsiyonel)" value={form.malikAdi}
               onChange={e => setForm(p => ({ ...p, malikAdi: e.target.value }))}
+              sx={{ mb: 2 }} />
+
+            <TextField fullWidth label="Plan Fonksiyonu (opsiyonel)" value={form.planFonksiyonu}
+              onChange={e => setForm(p => ({ ...p, planFonksiyonu: e.target.value }))}
               sx={{ mb: 2 }} />
 
             <TextField fullWidth multiline rows={2} label="Notlar (opsiyonel)" value={form.notlar}
@@ -281,75 +455,133 @@ export default function FeeCalculation() {
                 Harç Tarifesi
               </Typography>
               {isManager && (
-                <Button
-                  size="small"
-                  startIcon={<SettingsIcon />}
-                  onClick={openCreateRate}
-                  variant="outlined"
-                >
-                  Yeni Kalem
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" startIcon={<AddIcon />} onClick={openCreateCat} variant="outlined" color="secondary">
+                    Yeni Kategori
+                  </Button>
+                  <Button size="small" startIcon={<SettingsIcon />} onClick={openCreateRate} variant="outlined">
+                    Yeni Kalem
+                  </Button>
+                </Stack>
               )}
             </Box>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Ruhsat Türü</TableCell>
-                    <TableCell align="right">TL/m²</TableCell>
-                    <TableCell align="right">Katsayı</TableCell>
-                    {isManager && <TableCell align="center">Durum</TableCell>}
-                    {isManager && <TableCell align="center">İşlem</TableCell>}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rates.map(r => (
-                    <TableRow key={r.id} hover sx={{ opacity: r.isActive ? 1 : 0.5 }}>
-                      <TableCell>
-                        <Typography variant="body2">{r.ruhsatTuru}</Typography>
-                        {r.aciklama && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {r.aciklama}
-                          </Typography>
+
+            {/* Kategoriler + kalemler gruplu */}
+            {categories.length > 0 && (
+              <>
+                {[...categories].sort((a, b) => a.siraNo - b.siraNo).map(cat => {
+                  const catRates = rates.filter(r => r.categoryId === cat.id);
+                  return (
+                    <Box key={cat.id} sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'primary.50', px: 1.5, py: 0.75, borderRadius: 1 }}>
+                        <Typography variant="caption" fontWeight={700} color="primary">{cat.name}</Typography>
+                        {isManager && (
+                          <Stack direction="row">
+                            <IconButton size="small" onClick={() => openEditCat(cat)}><EditIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" color="error" onClick={() => setCatDeleteDialog({ open: true, id: cat.id })}><DeleteIcon fontSize="small" /></IconButton>
+                          </Stack>
                         )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" />
-                      </TableCell>
-                      <TableCell align="right">
-                        {r.katsayi != null
-                          ? <Chip label={r.katsayi} size="small" color="warning" variant="outlined" />
-                          : <Typography variant="caption" color="text.disabled">—</Typography>}
-                      </TableCell>
-                      {isManager && (
-                        <TableCell align="center">
-                          <Chip
-                            label={r.isActive ? 'Aktif' : 'Pasif'}
-                            size="small"
-                            color={r.isActive ? 'success' : 'default'}
-                          />
-                        </TableCell>
-                      )}
-                      {isManager && (
-                        <TableCell align="center">
-                          <Tooltip title="Düzenle">
-                            <IconButton size="small" color="primary" onClick={() => openEditRate(r)}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Sil">
-                            <IconButton size="small" color="error"
-                              onClick={() => setRateDeleteDialog({ open: true, id: r.id })}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      )}
+                      </Box>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableBody>
+                            {catRates.map(r => (
+                              <TableRow key={r.id} hover sx={{ opacity: r.isActive ? 1 : 0.5 }}>
+                                <TableCell>
+                                  <Typography variant="body2">{r.harcTuru}</Typography>
+                                  {r.aciklama && <Typography variant="caption" color="text.secondary" display="block">{r.aciklama}</Typography>}
+                                </TableCell>
+                                <TableCell align="right"><Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" /></TableCell>
+                                <TableCell align="right">
+                                  {r.katsayi != null ? <Chip label={r.katsayi} size="small" color="warning" variant="outlined" /> : <Typography variant="caption" color="text.disabled">—</Typography>}
+                                </TableCell>
+                                {isManager && <TableCell align="center"><Chip label={r.isActive ? 'Aktif' : 'Pasif'} size="small" color={r.isActive ? 'success' : 'default'} /></TableCell>}
+                                {isManager && (
+                                  <TableCell align="center">
+                                    <IconButton size="small" color="primary" onClick={() => openEditRate(r)}><EditIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" color="error" onClick={() => setRateDeleteDialog({ open: true, id: r.id })}><DeleteIcon fontSize="small" /></IconButton>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+                  );
+                })}
+                {/* Kategorisiz kalemler */}
+                {rates.filter(r => !r.categoryId).length > 0 && (
+                  <Box sx={{ mb: 1 }}>
+                    <Box sx={{ bgcolor: 'grey.100', px: 1.5, py: 0.75, borderRadius: 1, mb: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">Diğer</Typography>
+                    </Box>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableBody>
+                          {rates.filter(r => !r.categoryId).map(r => (
+                            <TableRow key={r.id} hover sx={{ opacity: r.isActive ? 1 : 0.5 }}>
+                              <TableCell>
+                                <Typography variant="body2">{r.harcTuru}</Typography>
+                                {r.aciklama && <Typography variant="caption" color="text.secondary" display="block">{r.aciklama}</Typography>}
+                              </TableCell>
+                              <TableCell align="right"><Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" /></TableCell>
+                              <TableCell align="right">
+                                {r.katsayi != null ? <Chip label={r.katsayi} size="small" color="warning" variant="outlined" /> : <Typography variant="caption" color="text.disabled">—</Typography>}
+                              </TableCell>
+                              {isManager && <TableCell align="center"><Chip label={r.isActive ? 'Aktif' : 'Pasif'} size="small" color={r.isActive ? 'success' : 'default'} /></TableCell>}
+                              {isManager && (
+                                <TableCell align="center">
+                                  <IconButton size="small" color="primary" onClick={() => openEditRate(r)}><EditIcon fontSize="small" /></IconButton>
+                                  <IconButton size="small" color="error" onClick={() => setRateDeleteDialog({ open: true, id: r.id })}><DeleteIcon fontSize="small" /></IconButton>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+              </>
+            )}
+            {/* Kategori yoksa düz liste */}
+            {categories.length === 0 && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Harç Türü</TableCell>
+                      <TableCell align="right">TL/m²</TableCell>
+                      <TableCell align="right">Katsayı</TableCell>
+                      {isManager && <TableCell align="center">Durum</TableCell>}
+                      {isManager && <TableCell align="center">İşlem</TableCell>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {rates.map(r => (
+                      <TableRow key={r.id} hover sx={{ opacity: r.isActive ? 1 : 0.5 }}>
+                        <TableCell>
+                          <Typography variant="body2">{r.harcTuru}</Typography>
+                          {r.aciklama && <Typography variant="caption" color="text.secondary" display="block">{r.aciklama}</Typography>}
+                        </TableCell>
+                        <TableCell align="right"><Chip label={`${r.birimHarc} TL/m²`} size="small" color="primary" variant="outlined" /></TableCell>
+                        <TableCell align="right">
+                          {r.katsayi != null ? <Chip label={r.katsayi} size="small" color="warning" variant="outlined" /> : <Typography variant="caption" color="text.disabled">—</Typography>}
+                        </TableCell>
+                        {isManager && <TableCell align="center"><Chip label={r.isActive ? 'Aktif' : 'Pasif'} size="small" color={r.isActive ? 'success' : 'default'} /></TableCell>}
+                        {isManager && (
+                          <TableCell align="center">
+                            <Tooltip title="Düzenle"><IconButton size="small" color="primary" onClick={() => openEditRate(r)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Sil"><IconButton size="small" color="error" onClick={() => setRateDeleteDialog({ open: true, id: r.id })}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
           </Paper>
         </Grid>
 
@@ -370,7 +602,7 @@ export default function FeeCalculation() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Ruhsat Türü</TableCell>
+                      <TableCell>Harç Türü</TableCell>
                       <TableCell>Ada/Parsel</TableCell>
                       <TableCell align="right">Alan</TableCell>
                       <TableCell align="right">Tutar</TableCell>
@@ -383,7 +615,7 @@ export default function FeeCalculation() {
                     {history.map(h => (
                       <TableRow key={h.id} hover>
                         <TableCell>
-                          <Typography variant="body2" fontWeight={500}>{h.ruhsatTuru}</Typography>
+                          <Typography variant="body2" fontWeight={500}>{h.harcTuru}</Typography>
                           <Typography variant="caption" color="text.secondary">{h.mahalle}</Typography>
                         </TableCell>
                         <TableCell>{h.ada}/{h.parsel}</TableCell>
@@ -439,9 +671,17 @@ export default function FeeCalculation() {
           {rateError && <Alert severity="error" sx={{ mb: 2 }}>{rateError}</Alert>}
           <Stack spacing={2} sx={{ mt: 0.5 }}>
             <TextField
-              label="Ruhsat Türü" required fullWidth
-              value={rateForm.ruhsatTuru}
-              onChange={e => setRateForm(p => ({ ...p, ruhsatTuru: e.target.value }))}
+              select fullWidth label="Harç Kategorisi (opsiyonel)"
+              value={rateForm.categoryId}
+              onChange={e => setRateForm(p => ({ ...p, categoryId: e.target.value }))}
+            >
+              <MenuItem value=""><em>Kategori yok</em></MenuItem>
+              {categories.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </TextField>
+            <TextField
+              label="Harç Türü" required fullWidth
+              value={rateForm.harcTuru}
+              onChange={e => setRateForm(p => ({ ...p, harcTuru: e.target.value }))}
             />
             <TextField
               label="Birim Harç (TL/m²)" required fullWidth type="number"
@@ -501,6 +741,44 @@ export default function FeeCalculation() {
         </DialogActions>
       </Dialog>
 
+      {/* ── Kategori Oluştur / Düzenle Dialog ── */}
+      <Dialog open={catDialogOpen} onClose={() => setCatDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {catEditId ? <EditIcon /> : <AddIcon />}
+          {catEditId ? 'Kategori Düzenle' : 'Yeni Harç Kategorisi'}
+        </DialogTitle>
+        <DialogContent dividers>
+          {catError && <Alert severity="error" sx={{ mb: 2 }}>{catError}</Alert>}
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField label="Kategori Adı" required fullWidth value={catForm.name}
+              onChange={e => setCatForm(p => ({ ...p, name: e.target.value }))} />
+            <TextField label="Açıklama (opsiyonel)" fullWidth value={catForm.description}
+              onChange={e => setCatForm(p => ({ ...p, description: e.target.value }))} />
+            <TextField label="Sıra No" fullWidth type="number" inputProps={{ min: '0' }}
+              value={catForm.siraNo}
+              onChange={e => setCatForm(p => ({ ...p, siraNo: e.target.value }))} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCatDialogOpen(false)}>İptal</Button>
+          <Button onClick={handleSaveCat} variant="contained" disabled={catSaving}>
+            {catSaving ? 'Kaydediliyor...' : 'Kaydet'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Kategori Silme Onay ── */}
+      <Dialog open={catDeleteDialog.open} onClose={() => setCatDeleteDialog({ open: false, id: null })}>
+        <DialogTitle>Kategoriyi Sil</DialogTitle>
+        <DialogContent>
+          <Typography>Bu kategoriyi silmek istediğinizden emin misiniz? Altındaki harç kalemleri kategorisiz kalacak.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCatDeleteDialog({ open: false, id: null })}>İptal</Button>
+          <Button color="error" variant="contained" onClick={handleDeleteCat}>Sil</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ── Detay Dialog ── */}
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Harç Hesaplama Detayı</DialogTitle>
@@ -509,8 +787,8 @@ export default function FeeCalculation() {
             <Box>
               <Grid container spacing={2} sx={{ mt: 0.5 }}>
                 <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">Ruhsat Türü</Typography>
-                  <Typography fontWeight={600}>{selectedCalc.ruhsatTuru}</Typography>
+                  <Typography variant="caption" color="text.secondary">Harç Türü</Typography>
+                  <Typography fontWeight={600}>{selectedCalc.harcTuru}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">Hesaplayan</Typography>
@@ -596,7 +874,7 @@ export default function FeeCalculation() {
               <Grid item xs={6}><b>Parsel:</b> {selectedCalc.parsel}</Grid>
               <Grid item xs={6}><b>Mahalle:</b> {selectedCalc.mahalle}</Grid>
               <Grid item xs={6}><b>Malik:</b> {selectedCalc.malikAdi || '—'}</Grid>
-              <Grid item xs={12}><b>Ruhsat Türü:</b> {selectedCalc.ruhsatTuru}</Grid>
+              <Grid item xs={12}><b>Harç Türü:</b> {selectedCalc.harcTuru}</Grid>
               <Grid item xs={4}><b>Alan:</b> {selectedCalc.alanM2} m²</Grid>
               <Grid item xs={4}><b>Birim Harç:</b> {selectedCalc.birimHarc} TL/m²</Grid>
               <Grid item xs={4}><b>Toplam Harç:</b> {formatCurrency(selectedCalc.toplamHarc)}</Grid>

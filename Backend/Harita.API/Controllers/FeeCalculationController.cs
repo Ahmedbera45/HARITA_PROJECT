@@ -17,6 +17,58 @@ namespace Harita.API.Controllers
             _service = service;
         }
 
+        // ─── Harç Kategorileri ─────────────────────────────────────────────
+
+        // GET api/feecalculation/categories
+        [HttpGet("categories")]
+        public async Task<IActionResult> GetCategories()
+        {
+            var result = await _service.GetCategoriesAsync();
+            return Ok(result);
+        }
+
+        // POST api/feecalculation/categories
+        [HttpPost("categories")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> CreateCategory([FromBody] CreateFeeCategoryDto dto)
+        {
+            try
+            {
+                var result = await _service.CreateCategoryAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // PUT api/feecalculation/categories/{id}
+        [HttpPut("categories/{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> UpdateCategory(Guid id, [FromBody] CreateFeeCategoryDto dto)
+        {
+            try
+            {
+                var result = await _service.UpdateCategoryAsync(id, dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // DELETE api/feecalculation/categories/{id}
+        [HttpDelete("categories/{id:guid}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> DeleteCategory(Guid id)
+        {
+            var deleted = await _service.DeleteCategoryAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+
         // ─── Harç Kalemleri ────────────────────────────────────────────────
 
         // GET api/feecalculation/rates

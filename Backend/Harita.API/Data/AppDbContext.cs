@@ -18,6 +18,15 @@ namespace Harita.API.Data
         public DbSet<ImportLog> ImportLogs { get; set; }
         public DbSet<FeeCalculation> FeeCalculations { get; set; }
         public DbSet<FeeRate> FeeRates { get; set; }
+        public DbSet<FeeCategory> FeeCategories { get; set; }
+        public DbSet<TevhidCalculation> TevhidCalculations { get; set; }
+        public DbSet<DynamicPage> DynamicPages { get; set; }
+        public DbSet<DynamicColumn> DynamicColumns { get; set; }
+        public DbSet<DynamicRow> DynamicRows { get; set; }
+        public DbSet<PermissionGroup> PermissionGroups { get; set; }
+        public DbSet<UserPermissionGroup> UserPermissionGroups { get; set; }
+        public DbSet<ImarPlan> ImarPlanlar { get; set; }
+        public DbSet<ImarPlanEk> ImarPlanEkler { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -65,10 +74,60 @@ namespace Harita.API.Data
                 .HasOne(i => i.ImportedByUser).WithMany()
                 .HasForeignKey(i => i.ImportedByUserId).OnDelete(DeleteBehavior.Restrict);
 
+            // Harç kategorisi
+            modelBuilder.Entity<FeeRate>()
+                .HasOne(r => r.Category).WithMany(c => c.FeeRates)
+                .HasForeignKey(r => r.CategoryId).OnDelete(DeleteBehavior.SetNull);
+
             // Harç hesaplama
             modelBuilder.Entity<FeeCalculation>()
                 .HasOne(f => f.User).WithMany()
                 .HasForeignKey(f => f.UserId).OnDelete(DeleteBehavior.Restrict);
+
+            // Tevhid hesaplama
+            modelBuilder.Entity<TevhidCalculation>()
+                .HasOne(t => t.CreatedByUser).WithMany()
+                .HasForeignKey(t => t.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TevhidCalculation>()
+                .HasOne(t => t.ReviewedByUser).WithMany()
+                .HasForeignKey(t => t.ReviewedByUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TevhidCalculation>()
+                .HasOne(t => t.Parcel).WithMany()
+                .HasForeignKey(t => t.ParcelId).OnDelete(DeleteBehavior.SetNull);
+
+            // Yetki Grupları
+            modelBuilder.Entity<UserPermissionGroup>()
+                .HasOne(upg => upg.User)
+                .WithMany(u => u.UserPermissionGroups)
+                .HasForeignKey(upg => upg.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<UserPermissionGroup>()
+                .HasOne(upg => upg.PermissionGroup)
+                .WithMany(pg => pg.UserPermissionGroups)
+                .HasForeignKey(upg => upg.PermissionGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Dinamik sayfalar
+            modelBuilder.Entity<DynamicPage>()
+                .HasOne(p => p.CreatedByUser).WithMany()
+                .HasForeignKey(p => p.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<DynamicColumn>()
+                .HasOne(c => c.Page).WithMany(p => p.Columns)
+                .HasForeignKey(c => c.PageId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<DynamicRow>()
+                .HasOne(r => r.Page).WithMany(p => p.Rows)
+                .HasForeignKey(r => r.PageId).OnDelete(DeleteBehavior.Cascade);
+
+            // İmar Planları
+            modelBuilder.Entity<ImarPlan>()
+                .HasOne(p => p.CreatedByUser).WithMany()
+                .HasForeignKey(p => p.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ImarPlanEk>()
+                .HasOne(e => e.ImarPlan).WithMany(p => p.Ekler)
+                .HasForeignKey(e => e.ImarPlanId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ImarPlanEk>()
+                .HasOne(e => e.Ekleyen).WithMany()
+                .HasForeignKey(e => e.EkleyenId).OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

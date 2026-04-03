@@ -1,4 +1,6 @@
 // JWT token'ı parse ederek kullanıcı bilgisi ve rolünü döndürür
+const MODULES = ['rehber', 'gorev', 'izin', 'harc', 'veriYukleme', 'tevhid', 'imarPlanlari', 'ozelSayfalar', 'kullanicilar'];
+
 function parseToken() {
   try {
     const token = localStorage.getItem('token');
@@ -22,9 +24,30 @@ function parseToken() {
       payload['sub'] ||
       null;
 
-    return { id, name, department, role };
+    const permissionsRaw = payload['Permissions'] || '{}';
+
+    return { id, name, department, role, permissionsRaw };
   } catch {
     return null;
+  }
+}
+
+function buildPermissions(role, permissionsRaw) {
+  // Admin/Manager → all true
+  if (role === 'Admin' || role === 'Manager') {
+    return Object.fromEntries(MODULES.map(m => [m, { view: true, edit: true }]));
+  }
+  // Staff → parse from JWT claim
+  try {
+    const parsed = JSON.parse(permissionsRaw);
+    // Ensure all modules present (default false if missing)
+    const result = {};
+    MODULES.forEach(m => {
+      result[m] = { view: !!(parsed[m]?.view), edit: !!(parsed[m]?.edit) };
+    });
+    return result;
+  } catch {
+    return Object.fromEntries(MODULES.map(m => [m, { view: false, edit: false }]));
   }
 }
 
@@ -42,6 +65,10 @@ export function useAuth() {
   }
 
   const userId = user?.id ?? null;
+  const permissions = buildPermissions(role, user?.permissionsRaw ?? '{}');
 
-  return { user, userId, role, isAdmin, isManager, isStaff, isLoggedIn, hasRole };
+  const canView = (module) => !!(permissions[module]?.view);
+  const canEdit = (module) => !!(permissions[module]?.edit);
+
+  return { user, userId, role, isAdmin, isManager, isStaff, isLoggedIn, hasRole, permissions, canView, canEdit };
 }

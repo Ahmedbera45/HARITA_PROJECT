@@ -128,10 +128,12 @@ export default function Directory() {
     }
   };
 
-  const filteredContacts = contacts.filter(c => 
-    (c.firstName + ' ' + c.lastName).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.institution || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredContacts = contacts.filter(c => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return [c.firstName, c.lastName, c.institution, c.title, c.department, c.phone, c.email, c.description]
+      .some(v => v && v.toLowerCase().includes(q));
+  });
 
   return (
     <Box>

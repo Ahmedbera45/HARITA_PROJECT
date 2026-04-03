@@ -1,6 +1,12 @@
 import api from './api';
 
 const feeService = {
+  // Harç kategorileri
+  getCategories: () => api.get('/FeeCalculation/categories').then(r => r.data),
+  createCategory: (data) => api.post('/FeeCalculation/categories', data).then(r => r.data),
+  updateCategory: (id, data) => api.put(`/FeeCalculation/categories/${id}`, data).then(r => r.data),
+  deleteCategory: (id) => api.delete(`/FeeCalculation/categories/${id}`).then(r => r.data),
+
   // Harç kalemleri
   getRates: () => api.get('/FeeCalculation/rates').then(r => r.data),
   createRate: (data) => api.post('/FeeCalculation/rates', data).then(r => r.data),

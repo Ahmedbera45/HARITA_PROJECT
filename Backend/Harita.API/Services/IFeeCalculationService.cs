@@ -15,5 +15,11 @@ namespace Harita.API.Services
         Task<FeeRateDto> CreateFeeRateAsync(CreateFeeRateDto dto);
         Task<FeeRateDto> UpdateFeeRateAsync(Guid id, UpdateFeeRateDto dto);
         Task<bool> DeleteFeeRateAsync(Guid id);
+
+        // Harç kategorileri
+        Task<List<FeeCategoryDto>> GetCategoriesAsync();
+        Task<FeeCategoryDto> CreateCategoryAsync(CreateFeeCategoryDto dto);
+        Task<FeeCategoryDto> UpdateCategoryAsync(Guid id, CreateFeeCategoryDto dto);
+        Task<bool> DeleteCategoryAsync(Guid id);
     }
 }

@@ -3,7 +3,7 @@ import {
   Box, Paper, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
-  DialogContentText, Tooltip, Stack, Avatar
+  DialogContentText, Tooltip, Stack, Avatar, Autocomplete
 } from '@mui/material';
 import {
   Add, Edit, Delete, Key, AdminPanelSettings,
@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import userService from '../services/userService';
+import permissionService from '../services/permissionService';
 
 const DEPARTMENTS = [
   'İmar ve Şehircilik Md.',
@@ -52,12 +53,14 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [allGroups, setAllGroups] = useState([]);
 
   // Oluştur / Düzenle dialog
   const [formOpen, setFormOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [selectedGroups, setSelectedGroups] = useState([]);
 
   // Şifre sıfırlama dialog
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -68,7 +71,10 @@ export default function Users() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    permissionService.getGroups().then(setAllGroups).catch(() => {});
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -80,12 +86,13 @@ export default function Users() {
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
+    setSelectedGroups([]);
     setIsEdit(false);
     setEditId(null);
     setFormOpen(true);
   };
 
-  const openEdit = (u) => {
+  const openEdit = async (u) => {
     setForm({
       name: u.name,
       surname: u.surname,
@@ -97,7 +104,19 @@ export default function Users() {
     });
     setIsEdit(true);
     setEditId(u.id);
+    setSelectedGroups([]);
     setFormOpen(true);
+    // getUserGroups returns full PermissionGroupDto[] objects — use them directly
+    try {
+      const [freshGroups, userGroups] = await Promise.all([
+        allGroups.length > 0 ? Promise.resolve(allGroups) : permissionService.getGroups(),
+        permissionService.getUserGroups(u.id),
+      ]);
+      if (allGroups.length === 0) setAllGroups(freshGroups);
+      setSelectedGroups(userGroups);
+    } catch {
+      setSelectedGroups([]);
+    }
   };
 
   const handleSave = async () => {
@@ -120,9 +139,13 @@ export default function Users() {
           role: form.role,
           isActive: form.isActive,
         });
+        // Assign permission groups (Staff only)
+        if (form.role === 'Staff') {
+          await permissionService.setUserGroups(editId, selectedGroups.map(g => g.id));
+        }
         toast.success('Kullanıcı güncellendi.');
       } else {
-        await userService.create({
+        const created = await userService.create({
           name: form.name,
           surname: form.surname,
           email: form.email,
@@ -130,6 +153,10 @@ export default function Users() {
           department: form.department || null,
           role: form.role,
         });
+        // Assign groups to new user if Staff and groups selected
+        if (form.role === 'Staff' && selectedGroups.length > 0 && created?.id) {
+          await permissionService.setUserGroups(created.id, selectedGroups.map(g => g.id));
+        }
         toast.success('Kullanıcı oluşturuldu.');
       }
       setFormOpen(false);
@@ -332,6 +359,24 @@ export default function Users() {
                 <MenuItem value={true}>Aktif</MenuItem>
                 <MenuItem value={false}>Pasif (Devre Dışı)</MenuItem>
               </TextField>
+            )}
+            {form.role === 'Staff' && (
+              <Autocomplete
+                multiple
+                options={allGroups}
+                getOptionLabel={(o) => o.name}
+                value={selectedGroups}
+                onChange={(_, val) => setSelectedGroups(val)}
+                isOptionEqualToValue={(o, v) => o.id === v.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Yetki Grupları"
+                    placeholder="Grup seçin..."
+                    helperText="Boş bırakılırsa kullanıcı hiçbir modüle erişemez."
+                  />
+                )}
+              />
             )}
           </Stack>
         </DialogContent>

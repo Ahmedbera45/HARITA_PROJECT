@@ -10,6 +10,12 @@ import Leaves from './pages/Leaves';
 import Import from './pages/Import';
 import FeeCalculation from './pages/FeeCalculation';
 import Users from './pages/Users';
+import TevhidCalculation from './pages/TevhidCalculation';
+import DynamicPages from './pages/DynamicPages';
+import DynamicPageDetail from './pages/DynamicPageDetail';
+import DynamicPageCreate from './pages/DynamicPageCreate';
+import PermissionGroups from './pages/PermissionGroups';
+import ImarPlanlari from './pages/ImarPlanlari';
 import { useAuth } from './hooks/useAuth';
 
 // Token var mı kontrolü
@@ -48,11 +54,37 @@ function App() {
           {/* Tüm roller — veri yükleme ve harç hesaplama */}
           <Route path="/import" element={<Import />} />
           <Route path="/fee-calculation" element={<FeeCalculation />} />
+          <Route path="/tevhid" element={<TevhidCalculation />} />
+
+          {/* /pages/:id — herkes kendi sayfasını görür (menüden tıklayarak gelir) */}
+          <Route path="/pages/:id" element={<DynamicPageDetail />} />
+
+          {/* /pages ve /pages/create — sadece yönetici */}
+          <Route path="/pages" element={
+            <RoleRoute roles={['Admin', 'Manager']}>
+              <DynamicPages />
+            </RoleRoute>
+          } />
+          <Route path="/pages/create" element={
+            <RoleRoute roles={['Admin', 'Manager']}>
+              <DynamicPageCreate />
+            </RoleRoute>
+          } />
 
           {/* Sadece Admin + Manager */}
           <Route path="/users" element={
             <RoleRoute roles={['Admin', 'Manager']}>
               <Users />
+            </RoleRoute>
+          } />
+
+          {/* İmar Planları — tüm roller (canView kontrolü MainLayout'ta) */}
+          <Route path="/imar-planlari" element={<ImarPlanlari />} />
+
+          {/* Sadece Admin */}
+          <Route path="/permissions" element={
+            <RoleRoute roles={['Admin']}>
+              <PermissionGroups />
             </RoleRoute>
           } />
         </Route>
