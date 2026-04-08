@@ -71,6 +71,11 @@ namespace Harita.API.Services
 
             int GetColIdx(string name) => colMap.TryGetValue(name, out var idx) ? idx : -1;
 
+            // Özel alanları yükle (ExtraData için)
+            var customFields = await _context.ParcelCustomFields
+                .Where(f => f.IsActive && !f.IsDeleted)
+                .ToListAsync();
+
             var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 1;
 
             for (int row = 2; row <= lastRow; row++)
@@ -110,6 +115,17 @@ namespace Harita.API.Services
 
                 string? OptStr(string col) { var idx = GetColIdx(col); if (idx <= 0) return null; var v = r.Cell(idx).GetString().Trim(); return string.IsNullOrEmpty(v) ? null : v; }
 
+                // Özel alanları ExtraData JSON'una yaz
+                string? extraData = null;
+                var extraDict = new Dictionary<string, string>();
+                foreach (var cf in customFields)
+                {
+                    var val = OptStr(cf.FieldKey);
+                    if (val != null) extraDict[cf.FieldKey] = val;
+                }
+                if (extraDict.Count > 0)
+                    extraData = JsonSerializer.Serialize(extraDict);
+
                 parcels.Add(new Parcel
                 {
                     Ada             = ada,
@@ -125,6 +141,7 @@ namespace Harita.API.Services
                     EskiAda         = OptStr("EskiAda"),
                     EskiParsel      = OptStr("EskiParsel"),
                     PlanFonksiyonu  = OptStr("PlanFonksiyonu"),
+                    ExtraData       = extraData,
                     ImportBatchId   = batchId
                 });
             }
@@ -206,9 +223,51 @@ namespace Harita.API.Services
                     EskiParsel      = p.EskiParsel,
                     PlanFonksiyonu  = p.PlanFonksiyonu,
                     Geometry        = p.Geometry,
-                    ImportBatchId   = p.ImportBatchId
+                    ImportBatchId   = p.ImportBatchId,
+                    ExtraData       = p.ExtraData
                 })
                 .ToListAsync();
+        }
+
+        public async Task<PagedResult<ParcelDto>> GetParcelsPagedAsync(string? batchId, string? mahalle, string? search, int page, int pageSize)
+        {
+            var q = _context.Parcels.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(batchId))
+                q = q.Where(p => p.ImportBatchId == batchId);
+            if (!string.IsNullOrWhiteSpace(mahalle))
+                q = q.Where(p => p.Mahalle.Contains(mahalle));
+            if (!string.IsNullOrWhiteSpace(search))
+                q = q.Where(p => p.Ada.Contains(search) || p.Parsel.Contains(search) || p.Mahalle.Contains(search) || (p.MalikAdi != null && p.MalikAdi.Contains(search)));
+
+            var total = await q.CountAsync();
+            var items = await q
+                .OrderBy(p => p.Mahalle).ThenBy(p => p.Ada).ThenBy(p => p.Parsel)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new ParcelDto
+                {
+                    Id             = p.Id,
+                    Ada            = p.Ada,
+                    Parsel         = p.Parsel,
+                    Mahalle        = p.Mahalle,
+                    Mevkii         = p.Mevkii,
+                    Alan           = p.Alan,
+                    Nitelik        = p.Nitelik,
+                    MalikAdi       = p.MalikAdi,
+                    PaftaNo        = p.PaftaNo,
+                    RayicBedel     = p.RayicBedel,
+                    YolGenisligi   = p.YolGenisligi,
+                    EskiAda        = p.EskiAda,
+                    EskiParsel     = p.EskiParsel,
+                    PlanFonksiyonu = p.PlanFonksiyonu,
+                    Geometry       = p.Geometry,
+                    ImportBatchId  = p.ImportBatchId,
+                    ExtraData      = p.ExtraData
+                })
+                .ToListAsync();
+
+            return new PagedResult<ParcelDto> { Items = items, Total = total, Page = page, PageSize = pageSize };
         }
 
         public async Task<ParcelDto> UpdateParcelAsync(Guid id, UpdateParcelDto dto)
@@ -229,6 +288,7 @@ namespace Harita.API.Services
             parcel.EskiAda         = dto.EskiAda;
             parcel.EskiParsel      = dto.EskiParsel;
             parcel.PlanFonksiyonu  = dto.PlanFonksiyonu;
+            if (dto.ExtraData != null) parcel.ExtraData = dto.ExtraData;
 
             await _context.SaveChangesAsync();
 
@@ -249,9 +309,29 @@ namespace Harita.API.Services
                 EskiParsel      = parcel.EskiParsel,
                 PlanFonksiyonu  = parcel.PlanFonksiyonu,
                 Geometry        = parcel.Geometry,
-                ImportBatchId   = parcel.ImportBatchId
+                ImportBatchId   = parcel.ImportBatchId,
+                ExtraData       = parcel.ExtraData
             };
         }
+        public async Task<List<string>> AutocompleteAsync(string q, string field)
+        {
+            var term = q.Trim().ToLower();
+            IQueryable<string?> query = field switch
+            {
+                "ada"    => _context.Parcels.Where(p => !p.IsDeleted && p.Ada != null && p.Ada.ToLower().Contains(term)).Select(p => p.Ada),
+                "parsel" => _context.Parcels.Where(p => !p.IsDeleted && p.Parsel != null && p.Parsel.ToLower().Contains(term)).Select(p => p.Parsel),
+                _        => _context.Parcels.Where(p => !p.IsDeleted && p.Mahalle != null && p.Mahalle.ToLower().Contains(term)).Select(p => p.Mahalle)
+            };
+
+            return await query
+                .Distinct()
+                .Where(v => v != null)
+                .OrderBy(v => v)
+                .Take(20)
+                .Select(v => v!)
+                .ToListAsync();
+        }
+
         public async Task<ParcelDto?> SearchParcelAsync(string ada, string parsel, string? mahalle = null)
         {
             var query = _context.Parcels
@@ -281,7 +361,172 @@ namespace Harita.API.Services
                 EskiParsel      = p.EskiParsel,
                 PlanFonksiyonu  = p.PlanFonksiyonu,
                 Geometry        = p.Geometry,
-                ImportBatchId   = p.ImportBatchId
+                ImportBatchId   = p.ImportBatchId,
+                ExtraData       = p.ExtraData
+            };
+        }
+
+        public async Task<MergeImportResultDto> MergeParcelsFromExcelAsync(IFormFile file, List<string> updateColumns)
+        {
+            if (file == null || file.Length == 0)
+                throw new Exception("Dosya boş veya seçilmemiş.");
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (ext != ".xlsx" && ext != ".xls")
+                throw new Exception("Sadece .xlsx veya .xls dosyaları kabul edilmektedir.");
+
+            var batchId = "MERGE-" + Guid.NewGuid().ToString("N")[..8].ToUpper();
+            var errors  = new List<string>();
+            int inserted = 0, updated = 0, skipped = 0;
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            stream.Position = 0;
+
+            using var workbook = new XLWorkbook(stream);
+            var sheet = workbook.Worksheets.First();
+
+            var headerRow = sheet.Row(1);
+            var colMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var cell in headerRow.CellsUsed())
+            {
+                var header = cell.GetString().Trim();
+                if (!string.IsNullOrEmpty(header))
+                    colMap[header] = cell.Address.ColumnNumber;
+            }
+
+            foreach (var req in RequiredColumns)
+            {
+                if (!colMap.ContainsKey(req))
+                    throw new Exception($"Zorunlu sütun bulunamadı: '{req}'.");
+            }
+
+            var customFields = await _context.ParcelCustomFields
+                .Where(f => f.IsActive && !f.IsDeleted)
+                .ToListAsync();
+
+            int GetColIdx(string name) => colMap.TryGetValue(name, out var idx) ? idx : -1;
+
+            var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 1;
+
+            for (int row = 2; row <= lastRow; row++)
+            {
+                var r = sheet.Row(row);
+                if (r.IsEmpty()) continue;
+
+                var ada    = r.Cell(colMap["Ada"]).GetString().Trim();
+                var parsel = r.Cell(colMap["Parsel"]).GetString().Trim();
+                var mah    = r.Cell(colMap["Mahalle"]).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(ada) || string.IsNullOrWhiteSpace(parsel) || string.IsNullOrWhiteSpace(mah))
+                {
+                    errors.Add($"Satır {row}: Ada, Parsel ve Mahalle zorunludur.");
+                    continue;
+                }
+
+                string? OptStr(string col) { var idx = GetColIdx(col); if (idx <= 0) return null; var v = r.Cell(idx).GetString().Trim(); return string.IsNullOrEmpty(v) ? null : v; }
+
+                double? ParseDouble(string col) {
+                    var idx = GetColIdx(col); if (idx <= 0) return null;
+                    var v = r.Cell(idx).GetString().Trim().Replace(',', '.');
+                    return double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+                }
+                decimal? ParseDecimal(string col) {
+                    var idx = GetColIdx(col); if (idx <= 0) return null;
+                    var v = r.Cell(idx).GetString().Trim().Replace(',', '.');
+                    return decimal.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+                }
+
+                var existing = await _context.Parcels
+                    .FirstOrDefaultAsync(p => !p.IsDeleted && p.Ada == ada && p.Parsel == parsel && p.Mahalle == mah);
+
+                if (existing == null)
+                {
+                    // Yeni kayıt ekle
+                    var extraDict2 = new Dictionary<string, string>();
+                    foreach (var cf in customFields) { var v = OptStr(cf.FieldKey); if (v != null) extraDict2[cf.FieldKey] = v; }
+
+                    _context.Parcels.Add(new Parcel
+                    {
+                        Ada            = ada,  Parsel = parsel,  Mahalle = mah,
+                        Mevkii         = OptStr("Mevkii"),
+                        Alan           = ParseDouble("Alan"),
+                        Nitelik        = OptStr("Nitelik"),
+                        MalikAdi       = OptStr("MalikAdi"),
+                        PaftaNo        = OptStr("PaftaNo"),
+                        RayicBedel     = ParseDecimal("RayicBedel"),
+                        YolGenisligi   = OptStr("YolGenisligi"),
+                        EskiAda        = OptStr("EskiAda"),
+                        EskiParsel     = OptStr("EskiParsel"),
+                        PlanFonksiyonu = OptStr("PlanFonksiyonu"),
+                        ExtraData      = extraDict2.Count > 0 ? JsonSerializer.Serialize(extraDict2) : null,
+                        ImportBatchId  = batchId
+                    });
+                    inserted++;
+                    continue;
+                }
+
+                // Mevcut kaydı sadece istenen sütunlarda güncelle
+                bool changed = false;
+                foreach (var col in updateColumns)
+                {
+                    switch (col)
+                    {
+                        case "Alan":          var a = ParseDouble("Alan");      if (a != null) { existing.Alan = a; changed = true; } break;
+                        case "RayicBedel":    var rb = ParseDecimal("RayicBedel"); if (rb != null) { existing.RayicBedel = rb; changed = true; } break;
+                        case "Mevkii":        var mv = OptStr("Mevkii");        if (mv != null) { existing.Mevkii = mv; changed = true; } break;
+                        case "Nitelik":       var nt = OptStr("Nitelik");       if (nt != null) { existing.Nitelik = nt; changed = true; } break;
+                        case "MalikAdi":      var ma = OptStr("MalikAdi");      if (ma != null) { existing.MalikAdi = ma; changed = true; } break;
+                        case "PaftaNo":       var pn = OptStr("PaftaNo");       if (pn != null) { existing.PaftaNo = pn; changed = true; } break;
+                        case "YolGenisligi":  var yg = OptStr("YolGenisligi");  if (yg != null) { existing.YolGenisligi = yg; changed = true; } break;
+                        case "EskiAda":       var ea = OptStr("EskiAda");       if (ea != null) { existing.EskiAda = ea; changed = true; } break;
+                        case "EskiParsel":    var ep = OptStr("EskiParsel");    if (ep != null) { existing.EskiParsel = ep; changed = true; } break;
+                        case "PlanFonksiyonu":var pf = OptStr("PlanFonksiyonu");if (pf != null) { existing.PlanFonksiyonu = pf; changed = true; } break;
+                        default:
+                            // Özel alan mı?
+                            var cf = customFields.FirstOrDefault(f => f.FieldKey == col);
+                            if (cf != null)
+                            {
+                                var cfVal = OptStr(cf.FieldKey);
+                                if (cfVal != null)
+                                {
+                                    var dict = string.IsNullOrEmpty(existing.ExtraData)
+                                        ? new Dictionary<string, string>()
+                                        : JsonSerializer.Deserialize<Dictionary<string, string>>(existing.ExtraData) ?? new();
+                                    dict[cf.FieldKey] = cfVal;
+                                    existing.ExtraData = JsonSerializer.Serialize(dict);
+                                    changed = true;
+                                }
+                            }
+                            break;
+                    }
+                }
+
+                if (changed) updated++; else skipped++;
+            }
+
+            var log = new ImportLog
+            {
+                BatchId          = batchId,
+                FileName         = file.FileName,
+                TotalRows        = inserted + updated + skipped + errors.Count,
+                SuccessRows      = inserted + updated,
+                ErrorRows        = errors.Count,
+                ErrorDetails     = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null,
+                ImportedByUserId = GetCurrentUserId()
+            };
+            _context.ImportLogs.Add(log);
+            await _context.SaveChangesAsync();
+
+            return new MergeImportResultDto
+            {
+                BatchId  = batchId,
+                FileName = file.FileName,
+                TotalRows = log.TotalRows,
+                Inserted = inserted,
+                Updated  = updated,
+                Skipped  = skipped,
+                Errors   = errors
             };
         }
 

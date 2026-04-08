@@ -5,6 +5,7 @@ namespace Harita.API.Services;
 public interface IImarPlanService
 {
     Task<List<ImarPlanDto>> GetAllAsync();
+    Task<PagedResult<ImarPlanDto>> GetPagedAsync(string? search, string? planTuru, string? durum, int? yil, int page, int pageSize);
     Task<ImarPlanDto?> GetByIdAsync(Guid id);
     Task<ImarPlanDto> CreateAsync(CreateImarPlanDto dto, Guid userId);
     Task<ImarPlanDto> UpdateAsync(Guid id, CreateImarPlanDto dto);

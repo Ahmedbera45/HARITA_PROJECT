@@ -10,6 +10,8 @@ namespace Harita.API.DTOs
         public DateTime? DueDate { get; set; }
         public DateTime CreatedAt { get; set; }
         public Guid CreatedByUserId { get; set; }
+        public string CreatedByName { get; set; } = string.Empty;
+        public bool IsHerkes { get; set; }
         public List<AssignedUserDto> AssignedUsers { get; set; } = new();
     }
 
@@ -27,6 +29,7 @@ namespace Harita.API.DTOs
         public string Status { get; set; } = "Bekliyor";
         public string Priority { get; set; } = "Orta";
         public DateTime? DueDate { get; set; }
+        public bool IsHerkes { get; set; } = false;
         public List<Guid> AssignedUserIds { get; set; } = new();
     }
 

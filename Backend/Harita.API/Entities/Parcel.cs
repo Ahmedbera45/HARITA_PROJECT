@@ -17,5 +17,6 @@ namespace Harita.API.Entities
         public string? PlanFonksiyonu { get; set; }   // İmar planı fonksiyonu
         public string? Geometry { get; set; }         // WKT formatında geometri (SHP'den)
         public string? ImportBatchId { get; set; }
+        public string? ExtraData { get; set; }        // JSON: {"BagYola":"5m","Irtifa":"4"}
     }
 }

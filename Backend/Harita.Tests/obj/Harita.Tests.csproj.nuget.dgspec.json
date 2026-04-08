@@ -75,6 +75,14 @@
               "target": "Package",
               "version": "[8.0.0, )"
             },
+            "NetTopologySuite.IO.GeoJSON": {
+              "target": "Package",
+              "version": "[4.0.0, )"
+            },
+            "NetTopologySuite.IO.ShapeFile": {
+              "target": "Package",
+              "version": "[2.1.0, )"
+            },
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
               "version": "[8.0.0, )"

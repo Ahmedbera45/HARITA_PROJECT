@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Paper, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, IconButton, Dialog,
@@ -16,6 +16,7 @@ import {
 import { toast } from 'react-toastify';
 import imarPlanService from '../services/imarPlanService';
 import { useAuth } from '../hooks/useAuth';
+import PaginationBar from '../components/PaginationBar';
 
 const PLAN_TURLERI = [
   'Uygulama İmar Planı (UİP)',
@@ -356,6 +357,7 @@ export default function ImarPlanlari() {
   const canManage = isAdmin || isManager;
 
   const [plans, setPlans] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -364,6 +366,8 @@ export default function ImarPlanlari() {
   const [filterTur, setFilterTur] = useState('');
   const [filterDurum, setFilterDurum] = useState('');
   const [filterYil, setFilterYil] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Create / Edit dialog
   const [formOpen, setFormOpen] = useState(false);
@@ -379,38 +383,32 @@ export default function ImarPlanlari() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  useEffect(() => { fetchPlans(); }, []);
-
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setPlans(await imarPlanService.getAll());
+      const result = await imarPlanService.getPaged({
+        search: search || undefined,
+        planTuru: filterTur || undefined,
+        durum: filterDurum || undefined,
+        yil: filterYil || undefined,
+        page,
+        pageSize,
+      });
+      setPlans(result.items);
+      setTotal(result.total);
     } catch { toast.error('İmar planları yüklenemedi.'); }
     finally { setLoading(false); }
-  };
+  }, [search, filterTur, filterDurum, filterYil, page, pageSize]);
 
-  // Client-side filtering
-  const filteredPlans = useMemo(() => {
-    return plans.filter(p => {
-      if (filterTur && p.planTuru !== filterTur) return false;
-      if (filterDurum && p.durum !== filterDurum) return false;
-      if (filterYil) {
-        const yil = p.onayTarihi ? new Date(p.onayTarihi).getFullYear().toString() : '';
-        if (yil !== filterYil) return false;
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        return [p.planNo, p.planAdi, p.mahalle, p.ada, p.parsel, p.konu, p.onayMakami]
-          .some(v => v && v.toLowerCase().includes(q));
-      }
-      return true;
-    });
-  }, [plans, search, filterTur, filterDurum, filterYil]);
+  useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
+  const handleFilterChange = (setter) => (val) => { setter(val); setPage(1); };
+
+  // Yıl seçenekleri — sabit aralık (server-side yıllar gelmediğinden)
   const yillar = useMemo(() => {
-    const set = new Set(plans.map(p => p.onayTarihi ? new Date(p.onayTarihi).getFullYear() : null).filter(Boolean));
-    return [...set].sort((a, b) => b - a);
-  }, [plans]);
+    const current = new Date().getFullYear();
+    return Array.from({ length: 30 }, (_, i) => current - i);
+  }, []);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -455,15 +453,14 @@ export default function ImarPlanlari() {
         aciklama: form.aciklama || null,
       };
       if (isEdit) {
-        const updated = await imarPlanService.update(editId, payload);
-        setPlans(prev => prev.map(p => p.id === editId ? { ...updated, ekler: p.ekler } : p));
+        await imarPlanService.update(editId, payload);
         toast.success('İmar planı güncellendi.');
       } else {
-        const created = await imarPlanService.create(payload);
-        setPlans(prev => [created, ...prev]);
+        await imarPlanService.create(payload);
         toast.success('İmar planı oluşturuldu.');
       }
       setFormOpen(false);
+      fetchPlans();
     } catch (e) { toast.error(getErrMsg(e)); }
     finally { setSaving(false); }
   };
@@ -471,8 +468,8 @@ export default function ImarPlanlari() {
   const handleDelete = async () => {
     try {
       await imarPlanService.delete(deleteId);
-      setPlans(prev => prev.filter(p => p.id !== deleteId));
       toast.success('İmar planı silindi.');
+      fetchPlans();
     } catch (e) { toast.error(getErrMsg(e)); }
     finally { setDeleteOpen(false); setDeleteId(null); }
   };
@@ -521,33 +518,33 @@ export default function ImarPlanlari() {
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
           <TextField
             size="small" placeholder="Plan No, Ad, Mahalle, Ada, Parsel..."
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search} onChange={e => handleFilterChange(setSearch)(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
             sx={{ minWidth: 260 }}
           />
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Plan Türü</InputLabel>
-            <Select value={filterTur} label="Plan Türü" onChange={e => setFilterTur(e.target.value)}>
+            <Select value={filterTur} label="Plan Türü" onChange={e => handleFilterChange(setFilterTur)(e.target.value)}>
               <MenuItem value="">Tümü</MenuItem>
               {PLAN_TURLERI.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <InputLabel>Durum</InputLabel>
-            <Select value={filterDurum} label="Durum" onChange={e => setFilterDurum(e.target.value)}>
+            <Select value={filterDurum} label="Durum" onChange={e => handleFilterChange(setFilterDurum)(e.target.value)}>
               <MenuItem value="">Tümü</MenuItem>
               {DURUMLAR.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Yıl</InputLabel>
-            <Select value={filterYil} label="Yıl" onChange={e => setFilterYil(e.target.value)}>
+            <Select value={filterYil} label="Yıl" onChange={e => handleFilterChange(setFilterYil)(e.target.value)}>
               <MenuItem value="">Tümü</MenuItem>
               {yillar.map(y => <MenuItem key={y} value={String(y)}>{y}</MenuItem>)}
             </Select>
           </FormControl>
           {(search || filterTur || filterDurum || filterYil) && (
-            <Button size="small" onClick={() => { setSearch(''); setFilterTur(''); setFilterDurum(''); setFilterYil(''); }}>
+            <Button size="small" onClick={() => { setSearch(''); setFilterTur(''); setFilterDurum(''); setFilterYil(''); setPage(1); }}>
               Temizle
             </Button>
           )}
@@ -574,11 +571,11 @@ export default function ImarPlanlari() {
               <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                 <CircularProgress size={24} />
               </TableCell></TableRow>
-            ) : filteredPlans.length === 0 ? (
+            ) : plans.length === 0 ? (
               <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                 Kayıt bulunamadı
               </TableCell></TableRow>
-            ) : filteredPlans.map(p => (
+            ) : plans.map(p => (
               <TableRow key={p.id} hover>
                 <TableCell>
                   <Typography variant="body2" fontWeight={700} color="primary.main">{p.planNo}</Typography>
@@ -633,10 +630,8 @@ export default function ImarPlanlari() {
             ))}
           </TableBody>
         </Table>
+        <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1); }} />
       </TableContainer>
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-        {filteredPlans.length} kayıt gösteriliyor {plans.length !== filteredPlans.length ? `(toplam ${plans.length})` : ''}
-      </Typography>
 
       {/* ─── Oluştur / Düzenle Dialog ─── */}
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="md" fullWidth>

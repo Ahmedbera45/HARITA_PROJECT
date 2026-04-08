@@ -32,6 +32,13 @@ namespace Harita.API.Controllers
             return Ok(contacts);
         }
 
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _contactService.GetPagedAsync(search, page, pageSize);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create(CreateContactDto dto)
         {

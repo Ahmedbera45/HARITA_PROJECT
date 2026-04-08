@@ -8,6 +8,8 @@ const tevhidService = {
   update: (id, data) => api.put(`/Tevhid/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/Tevhid/${id}`).then(r => r.data),
 
+  getPaged: (params) => api.get('/Tevhid/paged', { params }).then(r => r.data),
+
   exportAllApproved: () =>
     api.get('/Tevhid/export/approved', { responseType: 'blob' }),
   exportScenarios: (id) =>

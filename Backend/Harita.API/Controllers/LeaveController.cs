@@ -24,6 +24,20 @@ namespace Harita.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] string? personSearch,
+            [FromQuery] string? leaveType,
+            [FromQuery] string? status,
+            [FromQuery] DateTime? dateFrom,
+            [FromQuery] DateTime? dateTo,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _leaveService.GetPagedAsync(personSearch, leaveType, status, dateFrom, dateTo, page, pageSize);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create(CreateLeaveRequestDto dto)
         {
@@ -73,6 +87,49 @@ namespace Harita.API.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        [HttpGet("balance-summary")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        public async Task<IActionResult> GetBalanceSummary()
+        {
+            var result = await _leaveService.GetBalanceSummaryAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("hourly-summary")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        public async Task<IActionResult> GetHourlySummary()
+        {
+            var result = await _leaveService.GetHourlySummaryAsync();
+            return Ok(result);
+        }
+
+        [HttpPost("hourly-compensation")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        public async Task<IActionResult> AddHourlyCompensation(CreateHourlyCompensationDto dto)
+        {
+            try
+            {
+                var result = await _leaveService.AddHourlyCompensationAsync(dto);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("hourly-compensations")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        public async Task<IActionResult> GetAllHourlyCompensations()
+        {
+            var result = await _leaveService.GetAllHourlyCompensationsAsync();
+            return Ok(result);
         }
     }
 }

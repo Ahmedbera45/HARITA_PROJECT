@@ -192,6 +192,21 @@ namespace Harita.API.Services
             return list.Select(f => MapToDto(f, f.User)).ToList();
         }
 
+        public async Task<PagedResult<FeeCalculationDto>> GetPagedAsync(int page, int pageSize)
+        {
+            var query = _context.FeeCalculations.Include(f => f.User).AsQueryable();
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(f => f.CreatedAt)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .ToListAsync();
+            return new PagedResult<FeeCalculationDto>
+            {
+                Items = items.Select(f => MapToDto(f, f.User)).ToList(),
+                Total = total, Page = page, PageSize = pageSize
+            };
+        }
+
         public async Task<FeeCalculationDto?> GetByIdAsync(Guid id)
         {
             var f = await _context.FeeCalculations

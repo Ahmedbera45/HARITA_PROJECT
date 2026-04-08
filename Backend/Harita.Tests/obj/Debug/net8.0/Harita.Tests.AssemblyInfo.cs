@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Harita.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1e9079e442345486bf3d6cafac7ad7379923d8a4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a955922b79873177d251f8799dd7789b964b932")]
 [assembly: System.Reflection.AssemblyProductAttribute("Harita.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Harita.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

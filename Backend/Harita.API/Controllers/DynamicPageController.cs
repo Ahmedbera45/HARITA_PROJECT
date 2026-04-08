@@ -19,7 +19,7 @@ namespace Harita.API.Controllers
 
         // POST api/DynamicPage
         [HttpPost]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> CreatePage([FromBody] CreateDynamicPageDto dto)
         {
             try
@@ -52,7 +52,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/DynamicPage/{id}
         [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> DeletePage(Guid id)
         {
             var deleted = await _service.DeletePageAsync(id);
@@ -62,7 +62,7 @@ namespace Harita.API.Controllers
 
         // POST api/DynamicPage/{id}/import
         [HttpPost("{id:guid}/import")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         [RequestSizeLimit(20 * 1024 * 1024)]
         public async Task<IActionResult> ImportRows(Guid id, IFormFile file)
         {
@@ -83,7 +83,7 @@ namespace Harita.API.Controllers
 
         // POST api/DynamicPage/{id}/rows
         [HttpPost("{id:guid}/rows")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> AddRow(Guid id, [FromBody] UpsertRowDto dto)
         {
             try
@@ -99,7 +99,7 @@ namespace Harita.API.Controllers
 
         // PUT api/DynamicPage/{id}/rows/{rowId}
         [HttpPut("{id:guid}/rows/{rowId:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> UpdateRow(Guid id, Guid rowId, [FromBody] UpsertRowDto dto)
         {
             try
@@ -115,7 +115,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/DynamicPage/{id}/rows/{rowId}
         [HttpDelete("{id:guid}/rows/{rowId:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> DeleteRow(Guid id, Guid rowId)
         {
             var deleted = await _service.DeleteRowAsync(rowId);
@@ -125,7 +125,7 @@ namespace Harita.API.Controllers
 
         // POST api/DynamicPage/{id}/columns
         [HttpPost("{id:guid}/columns")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> AddColumn(Guid id, [FromBody] AddColumnDto dto)
         {
             try

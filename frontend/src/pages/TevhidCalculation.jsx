@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, TextField, Button, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
   Alert, Chip, Divider, IconButton, Tooltip, Radio, RadioGroup,
-  FormControlLabel, FormLabel, Stack,
+  FormControlLabel, FormLabel, Stack, Autocomplete,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -16,6 +16,7 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import tevhidService from '../services/tevhidService';
 import importService from '../services/importService';
 import { useAuth } from '../hooks/useAuth';
+import PaginationBar from '../components/PaginationBar';
 
 const formatCurrency = (val) =>
   val == null ? '—' : new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2 }).format(val) + ' ₺';
@@ -48,6 +49,9 @@ export default function TevhidCalculation() {
   const { isManager } = useAuth();
 
   const [list, setList] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -64,6 +68,14 @@ export default function TevhidCalculation() {
   const [searchParsel, setSearchParsel] = useState('');
   const [searchMahalle, setSearchMahalle] = useState('');
   const [searching, setSearching] = useState(false);
+  const [adaOptions, setAdaOptions] = useState([]);
+  const [parselOptions, setParselOptions] = useState([]);
+  const [mahalleOptions, setMahalleOptions] = useState([]);
+
+  const fetchAC = useCallback((field, q, setter) => {
+    if (!q || q.length < 2) { setter([]); return; }
+    importService.autocomplete(q, field).then(setter).catch(() => setter([]));
+  }, []);
 
   // Detay dialog
   const [detailOpen, setDetailOpen] = useState(false);
@@ -87,15 +99,25 @@ export default function TevhidCalculation() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
-  useEffect(() => { loadList(); }, []);
-
-  const loadList = () => {
+  const loadList = useCallback(() => {
     setLoading(true);
-    tevhidService.getAll()
-      .then(setList)
-      .catch(() => setError('Liste yüklenemedi'))
+    tevhidService.getPaged({
+      ada: filterAda || undefined,
+      parsel: filterParsel || undefined,
+      mahalle: filterMahalle || undefined,
+      status: filterStatus || undefined,
+      dateFrom: filterDateFrom || undefined,
+      dateTo: filterDateTo || undefined,
+      page, pageSize,
+    })
+      .then(r => { setList(r.items ?? []); setTotal(r.total ?? 0); })
+      .catch(() => { setList([]); setError('Liste yüklenemedi'); })
       .finally(() => setLoading(false));
-  };
+  }, [filterAda, filterParsel, filterMahalle, filterStatus, filterDateFrom, filterDateTo, page, pageSize]);
+
+  useEffect(() => { loadList(); }, [loadList]);
+
+  const handleFilterChange = (setter) => (val) => { setter(val); setPage(1); };
 
   // ── Parsel arama ──────────────────────────────────────────────────
   const handleParcelSearch = async () => {
@@ -288,25 +310,6 @@ export default function TevhidCalculation() {
     cekme: calcHarc(form.katsayi, form.cekmelerM2, form.rayicBedel),
   };
 
-  const filteredList = useMemo(() => {
-    return list.filter(item => {
-      if (filterAda && !item.ada.toLowerCase().includes(filterAda.toLowerCase())) return false;
-      if (filterParsel && !item.parselNo.toLowerCase().includes(filterParsel.toLowerCase())) return false;
-      if (filterMahalle && !item.mahalle.toLowerCase().includes(filterMahalle.toLowerCase())) return false;
-      if (filterStatus && item.status !== filterStatus) return false;
-      if (filterDateFrom) {
-        const d = new Date(item.createdAt);
-        if (d < new Date(filterDateFrom)) return false;
-      }
-      if (filterDateTo) {
-        const d = new Date(item.createdAt);
-        const to = new Date(filterDateTo);
-        to.setHours(23, 59, 59, 999);
-        if (d > to) return false;
-      }
-      return true;
-    });
-  }, [list, filterAda, filterParsel, filterMahalle, filterStatus, filterDateFrom, filterDateTo]);
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -332,19 +335,19 @@ export default function TevhidCalculation() {
       {/* Filtre Çubuğu */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-          <TextField size="small" label="Ada" value={filterAda} onChange={e => setFilterAda(e.target.value)} sx={{ width: 90 }} />
-          <TextField size="small" label="Parsel" value={filterParsel} onChange={e => setFilterParsel(e.target.value)} sx={{ width: 90 }} />
-          <TextField size="small" label="Mahalle" value={filterMahalle} onChange={e => setFilterMahalle(e.target.value)} sx={{ width: 140 }} />
-          <TextField select size="small" label="Durum" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} sx={{ width: 180 }}>
+          <TextField size="small" label="Ada" value={filterAda} onChange={e => handleFilterChange(setFilterAda)(e.target.value)} sx={{ width: 90 }} />
+          <TextField size="small" label="Parsel" value={filterParsel} onChange={e => handleFilterChange(setFilterParsel)(e.target.value)} sx={{ width: 90 }} />
+          <TextField size="small" label="Mahalle" value={filterMahalle} onChange={e => handleFilterChange(setFilterMahalle)(e.target.value)} sx={{ width: 140 }} />
+          <TextField select size="small" label="Durum" value={filterStatus} onChange={e => handleFilterChange(setFilterStatus)(e.target.value)} sx={{ width: 180 }}>
             {[{ v: '', l: 'Tümü' }, { v: 'Bekliyor', l: 'Bekliyor' }, { v: 'Onaylandı', l: 'Onaylandı' }, { v: 'Reddedildi', l: 'Reddedildi' }, { v: 'Düzeltme İstendi', l: 'Düzeltme İstendi' }].map(({ v, l }) => (
               <MenuItem key={v} value={v}>{l}</MenuItem>
             ))}
           </TextField>
           <TextField size="small" label="Başlangıç" type="date" value={filterDateFrom}
-            onChange={e => setFilterDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+            onChange={e => handleFilterChange(setFilterDateFrom)(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
           <TextField size="small" label="Bitiş" type="date" value={filterDateTo}
-            onChange={e => setFilterDateTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
-          <Button size="small" variant="text" onClick={() => { setFilterAda(''); setFilterParsel(''); setFilterMahalle(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); }}>
+            onChange={e => handleFilterChange(setFilterDateTo)(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+          <Button size="small" variant="text" onClick={() => { setFilterAda(''); setFilterParsel(''); setFilterMahalle(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); setPage(1); }}>
             Temizle
           </Button>
         </Stack>
@@ -363,9 +366,9 @@ export default function TevhidCalculation() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={10} align="center"><CircularProgress size={24} /></TableCell></TableRow>
-            ) : filteredList.length === 0 ? (
+            ) : list.length === 0 ? (
               <TableRow><TableCell colSpan={10} align="center">Kayıt yok</TableCell></TableRow>
-            ) : filteredList.map(item => (
+            ) : list.map(item => (
               <TableRow key={item.id} hover>
                 <TableCell>{item.ada}</TableCell>
                 <TableCell>{item.parselNo}</TableCell>
@@ -424,6 +427,7 @@ export default function TevhidCalculation() {
             ))}
           </TableBody>
         </Table>
+        <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1); }} />
       </TableContainer>
 
       {/* ── Yeni / Düzenle Dialog ───────────────────────────────────── */}
@@ -434,12 +438,30 @@ export default function TevhidCalculation() {
           <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
             <Typography variant="subtitle2" gutterBottom>Parselden Otomatik Getir</Typography>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <TextField label="Ada" size="small" value={searchAda}
-                onChange={e => setSearchAda(e.target.value)} sx={{ width: 100 }} />
-              <TextField label="Parsel" size="small" value={searchParsel}
-                onChange={e => setSearchParsel(e.target.value)} sx={{ width: 100 }} />
-              <TextField label="Mahalle (opsiyonel)" size="small" value={searchMahalle}
-                onChange={e => setSearchMahalle(e.target.value)} sx={{ width: 180 }} />
+              <Autocomplete
+                freeSolo size="small"
+                options={adaOptions}
+                inputValue={searchAda}
+                onInputChange={(_, v) => { setSearchAda(v); fetchAC('ada', v, setAdaOptions); }}
+                sx={{ width: 110 }}
+                renderInput={p => <TextField {...p} label="Ada" />}
+              />
+              <Autocomplete
+                freeSolo size="small"
+                options={parselOptions}
+                inputValue={searchParsel}
+                onInputChange={(_, v) => { setSearchParsel(v); fetchAC('parsel', v, setParselOptions); }}
+                sx={{ width: 110 }}
+                renderInput={p => <TextField {...p} label="Parsel" />}
+              />
+              <Autocomplete
+                freeSolo size="small"
+                options={mahalleOptions}
+                inputValue={searchMahalle}
+                onInputChange={(_, v) => { setSearchMahalle(v); fetchAC('mahalle', v, setMahalleOptions); }}
+                sx={{ width: 190 }}
+                renderInput={p => <TextField {...p} label="Mahalle (opsiyonel)" />}
+              />
               <Button variant="outlined" startIcon={searching ? <CircularProgress size={16} /> : <SearchIcon />}
                 onClick={handleParcelSearch} disabled={searching}>
                 Getir

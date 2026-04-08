@@ -7,6 +7,7 @@ namespace Harita.API.Services
         // Hesaplama
         Task<FeeCalculationDto> CalculateAsync(CreateFeeCalculationDto dto);
         Task<List<FeeCalculationDto>> GetAllAsync();
+        Task<PagedResult<FeeCalculationDto>> GetPagedAsync(int page, int pageSize);
         Task<FeeCalculationDto?> GetByIdAsync(Guid id);
         Task<bool> DeleteAsync(Guid id);
 

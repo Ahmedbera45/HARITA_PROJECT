@@ -53,8 +53,9 @@ namespace Harita.API.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Yeni kullanıcıya varsayılan Staff rolü ver
-            var staffRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Staff");
+            // Yeni kullanıcıya varsayılan Memur rolü ver
+            var staffRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Memur")
+                         ?? await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Staff");
             if (staffRole != null)
             {
                 _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = staffRole.Id });
@@ -71,11 +72,12 @@ namespace Harita.API.Services
 
         private async Task<string> BuildPermissionsJsonAsync(User user)
         {
-            // Admin/Manager → all permissions true; Staff → merge from groups
+            // Admin/Müdür/Şef → tüm izinler açık; diğerleri → gruplardan birleştir
             var roles = user.UserRoles?.Select(ur => ur.Role?.Name).Where(n => n != null).ToList() ?? new();
-            if (roles.Contains("Admin") || roles.Contains("Manager"))
+            var managerRoles = new[] { "Admin", "Müdür", "Şef", "Manager" };
+            if (roles.Any(r => managerRoles.Contains(r)))
             {
-                var modules = new[] { "rehber", "gorev", "izin", "harc", "veriYukleme", "tevhid", "ozelSayfalar", "kullanicilar" };
+                var modules = new[] { "rehber", "gorev", "izin", "harc", "veriYukleme", "tevhid", "imarPlanlari", "ozelSayfalar", "kullanicilar", "map" };
                 var allTrue = modules.ToDictionary(m => m, m => new { view = true, edit = true });
                 return JsonSerializer.Serialize(allTrue);
             }
@@ -141,7 +143,7 @@ namespace Harita.API.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddHours(24),
+                Expires = DateTime.UtcNow.AddHours(8),
                 Issuer = issuer,
                 Audience = audience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -153,7 +155,7 @@ namespace Harita.API.Services
             return new TokenDto
             {
                 AccessToken = tokenHandler.WriteToken(token),
-                ExpiresIn = 24 * 60 * 60
+                ExpiresIn = 8 * 60 * 60
             };
         }
     }

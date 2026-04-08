@@ -18,9 +18,22 @@ namespace Harita.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? priority)
+        public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? priority, [FromQuery] bool assignedToMe = false)
         {
-            var result = await _taskService.GetAllAsync(status, priority);
+            var result = await _taskService.GetAllAsync(status, priority, assignedToMe);
+            return Ok(result);
+        }
+
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] string? status,
+            [FromQuery] string? priority,
+            [FromQuery] string? search,
+            [FromQuery] Guid? assignedUserId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _taskService.GetPagedAsync(status, priority, search, assignedUserId, page, pageSize);
             return Ok(result);
         }
 
@@ -70,9 +83,16 @@ namespace Harita.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var result = await _taskService.DeleteAsync(id);
-            if (!result) return NotFound();
-            return NoContent();
+            try
+            {
+                var result = await _taskService.DeleteAsync(id);
+                if (!result) return NotFound();
+                return NoContent();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid();
+            }
         }
     }
 }

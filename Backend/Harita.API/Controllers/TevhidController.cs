@@ -32,6 +32,17 @@ namespace Harita.API.Controllers
             }
         }
 
+        // GET api/Tevhid/paged
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] string? ada, [FromQuery] string? parsel, [FromQuery] string? mahalle,
+            [FromQuery] string? status, [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo,
+            [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _service.GetPagedAsync(ada, parsel, mahalle, status, dateFrom, dateTo, page, pageSize);
+            return Ok(result);
+        }
+
         // GET api/Tevhid
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -51,7 +62,7 @@ namespace Harita.API.Controllers
 
         // PUT api/Tevhid/{id}/review
         [HttpPut("{id:guid}/review")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Review(Guid id, [FromBody] ReviewTevhidDto dto)
         {
             try
@@ -71,7 +82,7 @@ namespace Harita.API.Controllers
 
         // PUT api/Tevhid/{id}
         [HttpPut("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTevhidDto dto)
         {
             try
@@ -91,7 +102,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/Tevhid/{id}
         [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var deleted = await _service.DeleteAsync(id);
@@ -101,7 +112,7 @@ namespace Harita.API.Controllers
 
         // GET api/Tevhid/export/approved
         [HttpGet("export/approved")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> ExportAllApproved()
         {
             var bytes = await _service.ExportAllApprovedAsync();

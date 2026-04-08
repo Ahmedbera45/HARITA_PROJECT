@@ -1,8 +1,11 @@
 using ClosedXML.Excel;
+using Harita.API.Data;
 using Harita.API.DTOs;
+using Harita.API.Entities;
 using Harita.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Harita.API.Controllers
 {
@@ -12,34 +15,42 @@ namespace Harita.API.Controllers
     public class ImportController : ControllerBase
     {
         private readonly IImportService _importService;
+        private readonly AppDbContext _context;
 
-        public ImportController(IImportService importService)
+        public ImportController(IImportService importService, AppDbContext context)
         {
             _importService = importService;
+            _context = context;
         }
 
-        /// <summary>Gerçek .xlsx şablon dosyası indir</summary>
+        /// <summary>Gerçek .xlsx şablon dosyası indir (özel alanlar dahil)</summary>
         [HttpGet("template")]
-        public IActionResult GetTemplate()
+        public async Task<IActionResult> GetTemplate()
         {
+            var customFields = await _context.ParcelCustomFields
+                .Where(f => f.IsActive && !f.IsDeleted)
+                .OrderBy(f => f.SortOrder)
+                .ToListAsync();
+
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("Parseller");
 
-            // Başlık satırı
-            var headers = new[] { "Ada", "Parsel", "Mahalle", "Mevkii", "Alan", "Nitelik", "MalikAdi", "PaftaNo", "RayicBedel", "YolGenisligi", "EskiAda", "EskiParsel", "PlanFonksiyonu" };
-            for (int i = 0; i < headers.Length; i++)
+            var stdHeaders = new[] { "Ada", "Parsel", "Mahalle", "Mevkii", "Alan", "Nitelik", "MalikAdi", "PaftaNo", "RayicBedel", "YolGenisligi", "EskiAda", "EskiParsel", "PlanFonksiyonu" };
+            var allHeaders = stdHeaders.Concat(customFields.Select(f => f.FieldKey)).ToArray();
+
+            for (int i = 0; i < allHeaders.Length; i++)
             {
                 var cell = ws.Cell(1, i + 1);
-                cell.Value = headers[i];
+                cell.Value = allHeaders[i];
                 cell.Style.Font.Bold = true;
-                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1976d2");
+                cell.Style.Fill.BackgroundColor = i < stdHeaders.Length
+                    ? XLColor.FromHtml("#1976d2")
+                    : XLColor.FromHtml("#7b1fa2");
                 cell.Style.Font.FontColor = XLColor.White;
             }
 
-            // Örnek satırlar
-            ws.Cell(2, 1).Value = "100"; ws.Cell(2, 2).Value = "1";  ws.Cell(2, 3).Value = "Merkez";      ws.Cell(2, 4).Value = "Aşağı Mah."; ws.Cell(2, 5).Value = 500;  ws.Cell(2, 6).Value = "Arsa";  ws.Cell(2, 7).Value = "Ali Veli";  ws.Cell(2, 8).Value = "10-B"; ws.Cell(2, 9).Value = 250000; ws.Cell(2, 10).Value = "15+";  ws.Cell(2, 11).Value = "95";  ws.Cell(2, 12).Value = "3";
-            ws.Cell(3, 1).Value = "200"; ws.Cell(3, 2).Value = "5";  ws.Cell(3, 3).Value = "Fatih";       ws.Cell(3, 4).Value = "Yukarı Mah."; ws.Cell(3, 5).Value = 320; ws.Cell(3, 6).Value = "Konut"; ws.Cell(3, 7).Value = "Ayşe Kaya"; ws.Cell(3, 8).Value = "12-C"; ws.Cell(3, 9).Value = 180000; ws.Cell(3, 10).Value = "10-15"; ws.Cell(3, 11).Value = "";    ws.Cell(3, 12).Value = "";
-            ws.Cell(4, 1).Value = "305"; ws.Cell(4, 2).Value = "12"; ws.Cell(4, 3).Value = "Cumhuriyet"; ws.Cell(4, 4).Value = "";            ws.Cell(4, 5).Value = 750;  ws.Cell(4, 6).Value = "Tarla"; ws.Cell(4, 7).Value = "";          ws.Cell(4, 8).Value = "8-A";  ws.Cell(4, 9).Value = "";     ws.Cell(4, 10).Value = "7m";   ws.Cell(4, 11).Value = "300"; ws.Cell(4, 12).Value = "11";
+            ws.Cell(2, 1).Value = "100"; ws.Cell(2, 2).Value = "1";  ws.Cell(2, 3).Value = "Merkez";
+            ws.Cell(3, 1).Value = "200"; ws.Cell(3, 2).Value = "5";  ws.Cell(3, 3).Value = "Fatih";
 
             ws.Columns().AdjustToContents();
 
@@ -50,6 +61,102 @@ namespace Harita.API.Controllers
             return File(stream.ToArray(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "parsel_sablonu.xlsx");
+        }
+
+        // ── Özel Alan Yönetimi ───────────────────────────────────────────────
+
+        [HttpGet("custom-fields")]
+        public async Task<IActionResult> GetCustomFields()
+        {
+            var fields = await _context.ParcelCustomFields
+                .Where(f => !f.IsDeleted)
+                .OrderBy(f => f.SortOrder)
+                .Select(f => new { f.Id, f.FieldKey, f.DisplayName, f.FieldType, f.SortOrder, f.IsActive })
+                .ToListAsync();
+            return Ok(fields);
+        }
+
+        [HttpPost("custom-fields")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> CreateCustomField([FromBody] CustomFieldDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.FieldKey) || string.IsNullOrWhiteSpace(dto.DisplayName))
+                return BadRequest("FieldKey ve DisplayName zorunludur.");
+
+            // FieldKey sadece harf/rakam/alt çizgi
+            if (!System.Text.RegularExpressions.Regex.IsMatch(dto.FieldKey, @"^[A-Za-z0-9_]+$"))
+                return BadRequest("FieldKey sadece harf, rakam ve alt çizgi içerebilir.");
+
+            if (await _context.ParcelCustomFields.AnyAsync(f => f.FieldKey == dto.FieldKey && !f.IsDeleted))
+                return BadRequest($"'{dto.FieldKey}' anahtarı zaten kullanımda.");
+
+            var maxOrder = await _context.ParcelCustomFields.Where(f => !f.IsDeleted).MaxAsync(f => (int?)f.SortOrder) ?? 0;
+            var field = new ParcelCustomField
+            {
+                FieldKey    = dto.FieldKey,
+                DisplayName = dto.DisplayName,
+                FieldType   = dto.FieldType ?? "text",
+                SortOrder   = maxOrder + 1,
+                IsActive    = true,
+            };
+            _context.ParcelCustomFields.Add(field);
+            await _context.SaveChangesAsync();
+            return Ok(new { field.Id, field.FieldKey, field.DisplayName, field.FieldType, field.SortOrder, field.IsActive });
+        }
+
+        [HttpPut("custom-fields/{id:guid}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateCustomField(Guid id, [FromBody] CustomFieldDto dto)
+        {
+            var field = await _context.ParcelCustomFields.FindAsync(id);
+            if (field == null || field.IsDeleted) return NotFound();
+            field.DisplayName = dto.DisplayName ?? field.DisplayName;
+            field.FieldType   = dto.FieldType ?? field.FieldType;
+            field.SortOrder   = dto.SortOrder ?? field.SortOrder;
+            field.IsActive    = dto.IsActive ?? field.IsActive;
+            await _context.SaveChangesAsync();
+            return Ok(new { field.Id, field.FieldKey, field.DisplayName, field.FieldType, field.SortOrder, field.IsActive });
+        }
+
+        [HttpDelete("custom-fields/{id:guid}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteCustomField(Guid id)
+        {
+            var field = await _context.ParcelCustomFields.FindAsync(id);
+            if (field == null || field.IsDeleted) return NotFound();
+            field.IsDeleted = true;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // ── Birleştirme (Merge / Upsert) ────────────────────────────────────
+
+        /// <summary>Mevcut parsellere eksik sütunları ekle/güncelle</summary>
+        [HttpPost("parcels/merge")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> MergeParcels(IFormFile file, [FromQuery] string columns)
+        {
+            if (string.IsNullOrWhiteSpace(columns))
+                return BadRequest("Güncellenecek sütunlar belirtilmelidir (columns=RayicBedel,Alan,...).");
+            try
+            {
+                var updateColumns = columns.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                var result = await _importService.MergeParcelsFromExcelAsync(file, updateColumns);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>Ada, Parsel veya Mahalle için distinct autocomplete listesi</summary>
+        [HttpGet("parcels/autocomplete")]
+        public async Task<IActionResult> Autocomplete([FromQuery] string? q, [FromQuery] string field = "mahalle")
+        {
+            var result = await _importService.AutocompleteAsync(q ?? "", field);
+            return Ok(result);
         }
 
         /// <summary>Ada + Parsel ile veritabanında parsel ara</summary>
@@ -63,7 +170,7 @@ namespace Harita.API.Controllers
 
         /// <summary>SHP (ZIP) dosyasından parsel verisi içe aktar (Admin/Manager)</summary>
         [HttpPost("parcels/shp")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         [RequestSizeLimit(50 * 1024 * 1024)]
         public async Task<IActionResult> ImportShp(IFormFile file)
         {
@@ -80,7 +187,7 @@ namespace Harita.API.Controllers
 
         /// <summary>Excel dosyasından parsel verisi içe aktar (Admin/Manager)</summary>
         [HttpPost("parcels")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         [RequestSizeLimit(10 * 1024 * 1024)]
         public async Task<IActionResult> ImportParcels(IFormFile file)
         {
@@ -111,9 +218,22 @@ namespace Harita.API.Controllers
             return Ok(result);
         }
 
+        /// <summary>Parsel listesi — sayfalı</summary>
+        [HttpGet("parcels/paged")]
+        public async Task<IActionResult> GetParcelsPaged(
+            [FromQuery] string? batchId,
+            [FromQuery] string? mahalle,
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _importService.GetParcelsPagedAsync(batchId, mahalle, search, page, pageSize);
+            return Ok(result);
+        }
+
         /// <summary>Parsel kaydını güncelle (Admin/Manager)</summary>
         [HttpPut("parcels/{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> UpdateParcel(Guid id, [FromBody] UpdateParcelDto dto)
         {
             try

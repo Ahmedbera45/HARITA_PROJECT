@@ -97,6 +97,7 @@ builder.Services.AddScoped<ITevhidService, TevhidService>();
 builder.Services.AddScoped<IDynamicPageService, DynamicPageService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IImarPlanService, ImarPlanService>();
+builder.Services.AddScoped<IGisService, GisService>();
 
 var app = builder.Build();
 

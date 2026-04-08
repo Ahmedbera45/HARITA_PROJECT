@@ -11,6 +11,11 @@ namespace Harita.API.DTOs
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<string> Roles { get; set; } = new();
+
+        // İzin alanları
+        public int KalanIzinGunu { get; set; }
+        public DateTime? IzinYenilemeTarihi { get; set; }
+        public int IzinYenilenecekGun { get; set; }
     }
 
     public class CreateUserDto
@@ -20,7 +25,12 @@ namespace Harita.API.DTOs
         public required string Email { get; set; }
         public required string Password { get; set; }
         public string? Department { get; set; }
-        public string Role { get; set; } = "Staff";
+        public string Role { get; set; } = "Memur";
+
+        // İzin alanları
+        public int KalanIzinGunu { get; set; } = 0;
+        public DateTime? IzinYenilemeTarihi { get; set; }
+        public int IzinYenilenecekGun { get; set; } = 0;
     }
 
     public class UpdateUserDto
@@ -30,7 +40,12 @@ namespace Harita.API.DTOs
         public required string Email { get; set; }
         public string? Department { get; set; }
         public bool IsActive { get; set; } = true;
-        public string Role { get; set; } = "Staff";
+        public string Role { get; set; } = "Memur";
+
+        // İzin alanları
+        public int KalanIzinGunu { get; set; } = 0;
+        public DateTime? IzinYenilemeTarihi { get; set; }
+        public int IzinYenilenecekGun { get; set; } = 0;
     }
 
     public class ChangePasswordDto

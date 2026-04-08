@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Paper, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
@@ -6,7 +6,7 @@ import {
   DialogContentText, Tooltip, Stack, Avatar, Switch, FormControlLabel,
   Divider, Tabs, Tab,
 } from '@mui/material';
-import { Add, Delete, CheckCircle, Cancel, HourglassEmpty, Schedule, CalendarMonth, List as ListIcon } from '@mui/icons-material';
+import { Add, Delete, CheckCircle, Cancel, HourglassEmpty, Schedule, CalendarMonth, List as ListIcon, BalanceOutlined, AccessTime } from '@mui/icons-material';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -21,7 +21,9 @@ const CAL_MESSAGES = {
 };
 import { toast } from 'react-toastify';
 import leaveService from '../services/leaveService';
+import userService from '../services/userService';
 import { useAuth } from '../hooks/useAuth';
+import PaginationBar from '../components/PaginationBar';
 
 const STATUS_CHIP = {
   Bekliyor:   { color: 'warning', icon: <HourglassEmpty fontSize="inherit" /> },
@@ -45,7 +47,10 @@ const EMPTY_FORM = {
 
 export default function Leaves() {
   const [leaves, setLeaves] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,16 +72,55 @@ export default function Leaves() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [calEventDetail, setCalEventDetail] = useState(null);
 
+  // Takvim navigasyon state
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState('month');
+
+  // Kalan İzinler dialog
+  const [balanceOpen, setBalanceOpen] = useState(false);
+  const [balanceSummary, setBalanceSummary] = useState([]);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
+  // Saatlik İzinler dialog
+  const [hourlyOpen, setHourlyOpen] = useState(false);
+  const [hourlySummary, setHourlySummary] = useState([]);
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+
+  // Saatlik Telafi Gir dialog
+  const [compOpen, setCompOpen] = useState(false);
+  const [compSaving, setCompSaving] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [compForm, setCompForm] = useState({ userId: '', telafTarihi: '', baslangicSaati: '', bitisSaati: '', telafSaati: '', aciklama: '' });
+
   const { isManager } = useAuth();
 
-  useEffect(() => { fetchLeaves(); }, []);
-
-  const fetchLeaves = async () => {
+  const fetchLeaves = useCallback(async () => {
+    setLoading(true);
     try {
-      setLeaves(await leaveService.getAll());
+      const result = await leaveService.getPaged({
+        personSearch: filterPerson || undefined,
+        leaveType: filterType || undefined,
+        status: filterStatus || undefined,
+        dateFrom: filterDateFrom || undefined,
+        dateTo: filterDateTo || undefined,
+        page,
+        pageSize,
+      });
+      setLeaves(result.items);
+      setTotal(result.total);
     } catch { toast.error('İzinler yüklenemedi.'); }
     finally { setLoading(false); }
-  };
+  }, [filterPerson, filterType, filterStatus, filterDateFrom, filterDateTo, page, pageSize]);
+
+  useEffect(() => {
+    fetchLeaves();
+  }, [fetchLeaves]);
+
+  useEffect(() => {
+    if (isManager) {
+      userService.getAll().then(setUsers).catch(() => {});
+    }
+  }, [isManager]);
 
   const getErrMsg = (e) => {
     const d = e.response?.data;
@@ -137,26 +181,43 @@ export default function Leaves() {
     finally { setDeleteOpen(false); setDeleteId(null); }
   };
 
+  const openBalance = async () => {
+    setBalanceOpen(true);
+    setBalanceLoading(true);
+    try { setBalanceSummary(await leaveService.getBalanceSummary()); }
+    catch { toast.error('Kalan izin bilgisi alınamadı.'); }
+    finally { setBalanceLoading(false); }
+  };
+
+  const openHourly = async () => {
+    setHourlyOpen(true);
+    setHourlyLoading(true);
+    try { setHourlySummary(await leaveService.getHourlySummary()); }
+    catch { toast.error('Saatlik izin özeti alınamadı.'); }
+    finally { setHourlyLoading(false); }
+  };
+
+  const handleAddCompensation = async () => {
+    if (!compForm.userId || !compForm.telafTarihi || !compForm.telafSaati) {
+      toast.warning('Kullanıcı, tarih ve saat miktarı zorunludur.'); return;
+    }
+    setCompSaving(true);
+    try {
+      await leaveService.addHourlyCompensation(compForm);
+      toast.success('Telafi eklendi.');
+      setCompOpen(false);
+      setCompForm({ userId: '', telafTarihi: '', baslangicSaati: '', bitisSaati: '', telafSaati: '', aciklama: '' });
+    } catch (e) { toast.error(getErrMsg(e)); }
+    finally { setCompSaving(false); }
+  };
+
   const previewDays = !form.isSaatlik && form.startDate && form.endDate
     ? Math.max(0, Math.floor((new Date(form.endDate) - new Date(form.startDate)) / 86400000) + 1)
     : 0;
 
-  const filteredLeaves = useMemo(() => {
-    return leaves.filter(l => {
-      if (filterPerson && !(l.userFullName || '').toLowerCase().includes(filterPerson.toLowerCase())) return false;
-      if (filterType && l.leaveType !== filterType) return false;
-      if (filterStatus && l.status !== filterStatus) return false;
-      if (filterDateFrom && new Date(l.startDate) < new Date(filterDateFrom)) return false;
-      if (filterDateTo) {
-        const to = new Date(filterDateTo);
-        to.setHours(23, 59, 59, 999);
-        if (new Date(l.startDate) > to) return false;
-      }
-      return true;
-    });
-  }, [leaves, filterPerson, filterType, filterStatus, filterDateFrom, filterDateTo]);
+  const handleFilterChange = (setter) => (val) => { setter(val); setPage(1); };
 
-  const calendarEvents = useMemo(() => filteredLeaves
+  const calendarEvents = useMemo(() => leaves
     .filter(l => !l.isSaatlik && l.startDate)
     .map(l => ({
       id: l.id,
@@ -164,7 +225,7 @@ export default function Leaves() {
       start: new Date(l.startDate),
       end: new Date(l.endDate || l.startDate),
       resource: l,
-    })), [filteredLeaves]);
+    })), [leaves]);
 
   const eventStyleGetter = (event) => {
     const s = event.resource.status;
@@ -189,16 +250,31 @@ export default function Leaves() {
 
   return (
     <Box>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
         <Box>
           <Typography variant="h5" fontWeight="bold">İzin Yönetimi</Typography>
           <Typography variant="body2" color="text.secondary">
             Tüm personel izin talepleri
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-          İzin Talebi Oluştur
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
+          {isManager && (
+            <>
+              <Button variant="outlined" startIcon={<BalanceOutlined />} onClick={openBalance}>
+                Kalan İzinler
+              </Button>
+              <Button variant="outlined" startIcon={<AccessTime />} onClick={openHourly}>
+                Saatlik İzinler
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<AccessTime />} onClick={() => setCompOpen(true)}>
+                Telafi Gir
+              </Button>
+            </>
+          )}
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+            İzin Talebi Oluştur
+          </Button>
+        </Stack>
       </Box>
 
       {/* Özet Chips */}
@@ -210,7 +286,7 @@ export default function Leaves() {
             color={STATUS_CHIP[s].color}
             variant="outlined"
             icon={STATUS_CHIP[s].icon}
-            onClick={() => setFilterStatus(filterStatus === s ? '' : s)}
+            onClick={() => handleFilterChange(setFilterStatus)(filterStatus === s ? '' : s)}
             sx={{ cursor: 'pointer', fontWeight: filterStatus === s ? 700 : 400 }}
           />
         ))}
@@ -226,22 +302,22 @@ export default function Leaves() {
       <Paper sx={{ p: 1.5, mb: 2 }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
           {isManager && (
-            <TextField size="small" label="Personel" value={filterPerson} onChange={e => setFilterPerson(e.target.value)} sx={{ width: 150 }} />
+            <TextField size="small" label="Personel" value={filterPerson} onChange={e => handleFilterChange(setFilterPerson)(e.target.value)} sx={{ width: 150 }} />
           )}
-          <TextField select size="small" label="İzin Türü" value={filterType} onChange={e => setFilterType(e.target.value)} sx={{ width: 150 }}>
+          <TextField select size="small" label="İzin Türü" value={filterType} onChange={e => handleFilterChange(setFilterType)(e.target.value)} sx={{ width: 150 }}>
             <MenuItem value="">Tümü</MenuItem>
             {[...LEAVE_TYPES, 'Saatlik İzin'].map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label="Durum" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} sx={{ width: 150 }}>
+          <TextField select size="small" label="Durum" value={filterStatus} onChange={e => handleFilterChange(setFilterStatus)(e.target.value)} sx={{ width: 150 }}>
             {[{ v: '', l: 'Tümü' }, { v: 'Bekliyor', l: 'Bekliyor' }, { v: 'Onaylandı', l: 'Onaylandı' }, { v: 'Reddedildi', l: 'Reddedildi' }].map(({ v, l }) => (
               <MenuItem key={v} value={v}>{l}</MenuItem>
             ))}
           </TextField>
           <TextField size="small" label="Başlangıç" type="date" value={filterDateFrom}
-            onChange={e => setFilterDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+            onChange={e => handleFilterChange(setFilterDateFrom)(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
           <TextField size="small" label="Bitiş" type="date" value={filterDateTo}
-            onChange={e => setFilterDateTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
-          <Button size="small" variant="text" onClick={() => { setFilterPerson(''); setFilterType(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); }}>
+            onChange={e => handleFilterChange(setFilterDateTo)(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+          <Button size="small" variant="text" onClick={() => { setFilterPerson(''); setFilterType(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); setPage(1); }}>
             Temizle
           </Button>
         </Stack>
@@ -270,9 +346,9 @@ export default function Leaves() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={7} align="center">Yükleniyor...</TableCell></TableRow>
-            ) : filteredLeaves.length === 0 ? (
+            ) : leaves.length === 0 ? (
               <TableRow><TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>Kayıt bulunamadı</TableCell></TableRow>
-            ) : filteredLeaves.map(l => (
+            ) : leaves.map(l => (
               <TableRow key={l.id} hover>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -334,6 +410,7 @@ export default function Leaves() {
             ))}
           </TableBody>
         </Table>
+        <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1); }} />
       </TableContainer>
       )}
 
@@ -348,6 +425,11 @@ export default function Leaves() {
               eventPropGetter={eventStyleGetter}
               messages={CAL_MESSAGES}
               culture="tr"
+              date={calendarDate}
+              view={calendarView}
+              onNavigate={setCalendarDate}
+              onView={setCalendarView}
+              views={['month', 'week', 'day', 'agenda']}
               onSelectEvent={event => setCalEventDetail(event.resource)}
               style={{ height: '100%' }}
             />
@@ -529,6 +611,133 @@ export default function Leaves() {
         <DialogActions>
           <Button onClick={() => setDeleteOpen(false)}>İptal</Button>
           <Button onClick={handleDelete} color="error" variant="contained">Sil</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── Kalan İzinler Dialog ─── */}
+      <Dialog open={balanceOpen} onClose={() => setBalanceOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Kalan İzinler</DialogTitle>
+        <DialogContent dividers>
+          {balanceLoading ? (
+            <Box textAlign="center" py={3}><Typography>Yükleniyor...</Typography></Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Personel</strong></TableCell>
+                  <TableCell align="right"><strong>Kalan İzin</strong></TableCell>
+                  <TableCell align="right"><strong>Planlanan</strong></TableCell>
+                  <TableCell align="right"><strong>Bekleyen</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {balanceSummary.map(b => (
+                  <TableRow key={b.userId} hover>
+                    <TableCell>{b.fullName}</TableCell>
+                    <TableCell align="right"><Chip label={`${b.remainingDays} gün`} size="small" color="success" /></TableCell>
+                    <TableCell align="right"><Chip label={`${b.plannedDays} gün`} size="small" color="info" /></TableCell>
+                    <TableCell align="right"><Chip label={`${b.pendingDays} gün`} size="small" color="warning" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBalanceOpen(false)}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── Saatlik İzinler Dialog ─── */}
+      <Dialog open={hourlyOpen} onClose={() => setHourlyOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Saatlik İzin Özeti</DialogTitle>
+        <DialogContent dividers>
+          {hourlyLoading ? (
+            <Box textAlign="center" py={3}><Typography>Yükleniyor...</Typography></Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Personel</strong></TableCell>
+                  <TableCell align="right"><strong>Alınan (saat)</strong></TableCell>
+                  <TableCell align="right"><strong>Telafi Edilen (saat)</strong></TableCell>
+                  <TableCell align="right"><strong>Kalan Telafi</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {hourlySummary.map(h => (
+                  <TableRow key={h.userId} hover>
+                    <TableCell>{h.fullName}</TableCell>
+                    <TableCell align="right">{h.totalHourlyLeaveHours?.toFixed(1)}</TableCell>
+                    <TableCell align="right">{h.totalCompensatedHours?.toFixed(1)}</TableCell>
+                    <TableCell align="right">
+                      <Chip
+                        label={`${(h.totalHourlyLeaveHours - h.totalCompensatedHours).toFixed(1)} saat`}
+                        size="small"
+                        color={(h.totalHourlyLeaveHours - h.totalCompensatedHours) > 0 ? 'warning' : 'success'}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHourlyOpen(false)}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── Saatlik Telafi Gir Dialog ─── */}
+      <Dialog open={compOpen} onClose={() => setCompOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Saatlik İzin Telafisi Gir</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField
+              select label="Personel" fullWidth required
+              value={compForm.userId}
+              onChange={e => setCompForm({ ...compForm, userId: e.target.value })}
+            >
+              {users.map(u => <MenuItem key={u.id} value={u.id}>{u.fullName}</MenuItem>)}
+            </TextField>
+            <TextField
+              type="date" label="Telafi Tarihi" fullWidth required
+              InputLabelProps={{ shrink: true }}
+              value={compForm.telafTarihi}
+              onChange={e => setCompForm({ ...compForm, telafTarihi: e.target.value })}
+            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                type="time" label="Başlangıç Saati" fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={compForm.baslangicSaati}
+                onChange={e => setCompForm({ ...compForm, baslangicSaati: e.target.value })}
+              />
+              <TextField
+                type="time" label="Bitiş Saati" fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={compForm.bitisSaati}
+                onChange={e => setCompForm({ ...compForm, bitisSaati: e.target.value })}
+              />
+            </Stack>
+            <TextField
+              type="number" label="Telafi Saati" fullWidth required
+              inputProps={{ min: 0, step: 0.25 }}
+              value={compForm.telafSaati}
+              onChange={e => setCompForm({ ...compForm, telafSaati: e.target.value })}
+            />
+            <TextField
+              label="Açıklama (isteğe bağlı)" fullWidth multiline rows={2}
+              value={compForm.aciklama}
+              onChange={e => setCompForm({ ...compForm, aciklama: e.target.value })}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCompOpen(false)}>İptal</Button>
+          <Button variant="contained" onClick={handleAddCompensation} disabled={compSaving}>
+            {compSaving ? 'Kaydediliyor...' : 'Kaydet'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

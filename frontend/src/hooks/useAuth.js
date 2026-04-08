@@ -1,11 +1,32 @@
 // JWT token'ı parse ederek kullanıcı bilgisi ve rolünü döndürür
-const MODULES = ['rehber', 'gorev', 'izin', 'harc', 'veriYukleme', 'tevhid', 'imarPlanlari', 'ozelSayfalar', 'kullanicilar'];
+const MODULES = ['rehber', 'gorev', 'izin', 'harc', 'veriYukleme', 'tevhid', 'imarPlanlari', 'ozelSayfalar', 'kullanicilar', 'map'];
+
+// Müdür ve Şef = Manager seviyesi
+export const MANAGER_ROLES = ['Admin', 'Müdür', 'Şef'];
+const STAFF_ROLES = ['Harita Mühendisi', 'Harita Teknikeri', 'Memur', 'Şehir Plancısı'];
+
+function decodeJwtPayload(token) {
+  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(
+    atob(base64)
+      .split('')
+      .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+      .join('')
+  );
+  return JSON.parse(jsonPayload);
+}
 
 function parseToken() {
   try {
     const token = localStorage.getItem('token');
     if (!token) return null;
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = decodeJwtPayload(token);
+
+    // Token süresi dolmuş mu kontrol et
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('token');
+      return null;
+    }
 
     const role =
       payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
@@ -33,14 +54,13 @@ function parseToken() {
 }
 
 function buildPermissions(role, permissionsRaw) {
-  // Admin/Manager → all true
-  if (role === 'Admin' || role === 'Manager') {
+  // Admin/Müdür/Şef → tüm modüller açık
+  if (MANAGER_ROLES.includes(role)) {
     return Object.fromEntries(MODULES.map(m => [m, { view: true, edit: true }]));
   }
-  // Staff → parse from JWT claim
+  // Staff rolleri → JWT claim'inden parse et
   try {
     const parsed = JSON.parse(permissionsRaw);
-    // Ensure all modules present (default false if missing)
     const result = {};
     MODULES.forEach(m => {
       result[m] = { view: !!(parsed[m]?.view), edit: !!(parsed[m]?.edit) };
@@ -56,8 +76,8 @@ export function useAuth() {
 
   const role = user?.role ?? null;
   const isAdmin   = role === 'Admin';
-  const isManager = role === 'Manager' || role === 'Admin';
-  const isStaff   = role === 'Staff';
+  const isManager = MANAGER_ROLES.includes(role);
+  const isStaff   = STAFF_ROLES.includes(role);
   const isLoggedIn = !!user;
 
   function hasRole(...roles) {

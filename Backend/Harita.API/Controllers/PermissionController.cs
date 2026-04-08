@@ -69,7 +69,7 @@ public class PermissionController : ControllerBase
 
     // GET /api/Permission/user/{userId}/groups — Get user's groups (Admin, Manager)
     [HttpGet("user/{userId}/groups")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Müdür,Şef")]
     public async Task<IActionResult> GetUserGroups(Guid userId)
     {
         var result = await _permissionService.GetUserGroupsAsync(userId);

@@ -10,6 +10,10 @@ namespace Harita.API.Entities
 
         // Görevi kim oluşturdu?
         public Guid CreatedByUserId { get; set; }
+        public User? CreatedByUser { get; set; }
+
+        // Herkes görebilir mi? (atanan kişi yerine "Herkes" seçildi)
+        public bool IsHerkes { get; set; } = false;
 
         // Çoklu atama — TaskAssignment join tablosu üzerinden
         public ICollection<TaskAssignment> Assignments { get; set; } = new List<TaskAssignment>();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Box, Paper, Typography, Button, TextField, InputAdornment, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import contactService from '../services/contactService';
+import PaginationBar from '../components/PaginationBar';
 
 const stringToColor = (string) => {
   let hash = 0;
@@ -27,8 +28,11 @@ const stringToColor = (string) => {
 
 export default function Directory() {
   const [contacts, setContacts] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   
   // Dialog Kontrolleri
   const [openFormDialog, setOpenFormDialog] = useState(false);
@@ -45,21 +49,21 @@ export default function Directory() {
     phoneNumber: '', email: '', description: ''
   });
 
-  useEffect(() => {
-    fetchContacts();
-  }, []);
-
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await contactService.getAll();
-      setContacts(data);
+      const result = await contactService.getPaged({ search: searchTerm || undefined, page, pageSize });
+      setContacts(result.items);
+      setTotal(result.total);
     } catch (error) {
       console.error(error);
       toast.error("Liste yüklenirken hata oluştu.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, page, pageSize]);
+
+  useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
   // --- SİLME İŞLEMLERİ ---
   const handleDeleteClick = (id) => {
@@ -128,12 +132,6 @@ export default function Directory() {
     }
   };
 
-  const filteredContacts = contacts.filter(c => {
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    return [c.firstName, c.lastName, c.institution, c.title, c.department, c.phone, c.email, c.description]
-      .some(v => v && v.toLowerCase().includes(q));
-  });
 
   return (
     <Box>
@@ -141,7 +139,7 @@ export default function Directory() {
         <div>
           <Typography variant="h5" fontWeight="bold">Kurum Rehberi</Typography>
           <Typography variant="body2" color="text.secondary">
-            Kayıtlı kişi ve kurumlar ({filteredContacts.length})
+            Kayıtlı kişi ve kurumlar ({total})
           </Typography>
         </div>
         
@@ -150,7 +148,7 @@ export default function Directory() {
             size="small"
             placeholder="İsim veya Kurum Ara..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             InputProps={{ startAdornment: (<InputAdornment position="start"><Search /></InputAdornment>) }}
             sx={{ bgcolor: 'background.paper' }}
           />
@@ -175,10 +173,10 @@ export default function Directory() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
-            ) : filteredContacts.length === 0 ? (
+            ) : contacts.length === 0 ? (
               <TableRow><TableCell colSpan={5} align="center">Kayıt bulunamadı.</TableCell></TableRow>
             ) : (
-              filteredContacts.map((row) => (
+              contacts.map((row) => (
                 <TableRow key={row.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -238,6 +236,7 @@ export default function Directory() {
             )}
           </TableBody>
         </Table>
+        <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1); }} />
       </TableContainer>
 
       {/* --- FORM DIALOG (EKLEME VE DÜZENLEME İÇİN ORTAK) --- */}

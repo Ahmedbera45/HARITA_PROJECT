@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Paper, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import userService from '../services/userService';
 import permissionService from '../services/permissionService';
+import PaginationBar from '../components/PaginationBar';
 
 const DEPARTMENTS = [
   'İmar ve Şehircilik Md.',
@@ -23,18 +24,26 @@ const DEPARTMENTS = [
   'İnsan Kaynakları Md.',
 ];
 
-const ROLES = ['Admin', 'Manager', 'Staff'];
+const ROLES = ['Müdür', 'Şef', 'Harita Mühendisi', 'Harita Teknikeri', 'Memur', 'Şehir Plancısı'];
 
 const ROLE_COLORS = {
-  Admin:   'error',
-  Manager: 'warning',
-  Staff:   'info',
+  Admin:              'error',
+  Müdür:              'warning',
+  Şef:                'warning',
+  'Harita Mühendisi': 'info',
+  'Harita Teknikeri': 'info',
+  Memur:              'default',
+  'Şehir Plancısı':   'secondary',
 };
 
 const ROLE_LABELS = {
-  Admin:   'Yönetici (Admin)',
-  Manager: 'Müdür (Manager)',
-  Staff:   'Personel (Staff)',
+  Admin:              'Admin (Sistem)',
+  Müdür:              'Müdür',
+  Şef:                'Şef',
+  'Harita Mühendisi': 'Harita Mühendisi',
+  'Harita Teknikeri': 'Harita Teknikeri',
+  Memur:              'Memur',
+  'Şehir Plancısı':   'Şehir Plancısı',
 };
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
@@ -47,13 +56,24 @@ const getErrMsg = (e) => {
   return 'İşlem başarısız.';
 };
 
-const EMPTY_FORM = { name: '', surname: '', email: '', password: '', department: '', role: 'Staff', isActive: true };
+const MANAGER_ROLES = ['Müdür', 'Şef'];
+const EMPTY_FORM = {
+  name: '', surname: '', email: '', password: '', department: '', role: 'Memur', isActive: true,
+  kalanIzinGunu: 0, izinYenilemeTarihi: '', izinYenilenecekGun: 0
+};
 
 export default function Users() {
   const [users, setUsers] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [allGroups, setAllGroups] = useState([]);
+
+  // Filtreler
+  const [search, setSearch] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Oluştur / Düzenle dialog
   const [formOpen, setFormOpen] = useState(false);
@@ -71,18 +91,25 @@ export default function Users() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  useEffect(() => {
-    fetchUsers();
-    permissionService.getGroups().then(setAllGroups).catch(() => {});
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setUsers(await userService.getAll());
+      const result = await userService.getPaged({
+        search: search || undefined,
+        role: filterRole || undefined,
+        page,
+        pageSize,
+      });
+      setUsers(result.items);
+      setTotal(result.total);
     } catch { toast.error('Kullanıcılar yüklenemedi.'); }
     finally { setLoading(false); }
-  };
+  }, [search, filterRole, page, pageSize]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { permissionService.getGroups().then(setAllGroups).catch(() => {}); }, []);
+
+  const handleFilterChange = (setter) => (val) => { setter(val); setPage(1); };
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -99,8 +126,11 @@ export default function Users() {
       email: u.email,
       password: '',
       department: u.department || '',
-      role: u.roles?.[0] || 'Staff',
+      role: u.roles?.[0] || 'Memur',
       isActive: u.isActive,
+      kalanIzinGunu: u.kalanIzinGunu ?? 0,
+      izinYenilemeTarihi: u.izinYenilemeTarihi ? u.izinYenilemeTarihi.substring(0, 10) : '',
+      izinYenilenecekGun: u.izinYenilenecekGun ?? 0,
     });
     setIsEdit(true);
     setEditId(u.id);
@@ -130,6 +160,7 @@ export default function Users() {
     }
     setSaving(true);
     try {
+      const isStaffRole = !MANAGER_ROLES.includes(form.role) && form.role !== 'Admin';
       if (isEdit) {
         await userService.update(editId, {
           name: form.name,
@@ -138,9 +169,12 @@ export default function Users() {
           department: form.department || null,
           role: form.role,
           isActive: form.isActive,
+          kalanIzinGunu: Number(form.kalanIzinGunu) || 0,
+          izinYenilemeTarihi: form.izinYenilemeTarihi || null,
+          izinYenilenecekGun: Number(form.izinYenilenecekGun) || 0,
         });
         // Assign permission groups (Staff only)
-        if (form.role === 'Staff') {
+        if (isStaffRole) {
           await permissionService.setUserGroups(editId, selectedGroups.map(g => g.id));
         }
         toast.success('Kullanıcı güncellendi.');
@@ -152,9 +186,12 @@ export default function Users() {
           password: form.password,
           department: form.department || null,
           role: form.role,
+          kalanIzinGunu: Number(form.kalanIzinGunu) || 0,
+          izinYenilemeTarihi: form.izinYenilemeTarihi || null,
+          izinYenilenecekGun: Number(form.izinYenilenecekGun) || 0,
         });
         // Assign groups to new user if Staff and groups selected
-        if (form.role === 'Staff' && selectedGroups.length > 0 && created?.id) {
+        if (isStaffRole && selectedGroups.length > 0 && created?.id) {
           await permissionService.setUserGroups(created.id, selectedGroups.map(g => g.id));
         }
         toast.success('Kullanıcı oluşturuldu.');
@@ -206,11 +243,19 @@ export default function Users() {
         </Button>
       </Box>
 
-      {/* Rol Açıklamaları */}
-      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-        {ROLES.map(r => (
-          <Chip key={r} label={ROLE_LABELS[r]} color={ROLE_COLORS[r]} variant="outlined" size="small" />
-        ))}
+      {/* Arama ve Filtreler */}
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap">
+        <TextField
+          size="small" label="Ad / E-Posta Ara" value={search}
+          onChange={e => handleFilterChange(setSearch)(e.target.value)} sx={{ width: 220 }}
+        />
+        <TextField
+          select size="small" label="Rol" value={filterRole}
+          onChange={e => handleFilterChange(setFilterRole)(e.target.value)} sx={{ width: 180 }}
+        >
+          <MenuItem value="">Tümü</MenuItem>
+          {['Admin', ...ROLES].map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+        </TextField>
       </Stack>
 
       {/* Kullanıcı Tablosu */}
@@ -291,6 +336,7 @@ export default function Users() {
             ))}
           </TableBody>
         </Table>
+        <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1); }} />
       </TableContainer>
 
       {/* ─── Kullanıcı Oluştur / Düzenle Dialog ─── */}
@@ -337,15 +383,15 @@ export default function Users() {
               onChange={e => setForm({ ...form, role: e.target.value })}
               helperText={
                 form.role === 'Admin' ? 'Tüm sayfalara erişim, kullanıcı yönetimi' :
-                form.role === 'Manager' ? 'İzin onayı, veri yükleme, harç hesaplama' :
+                MANAGER_ROLES.includes(form.role) ? 'İzin onayı, veri yükleme, harç hesaplama' :
                 'Temel görev ve izin işlemleri'
               }
             >
               {ROLES.map(r => (
                 <MenuItem key={r} value={r}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Chip label={r} size="small" color={ROLE_COLORS[r]} />
-                    <span>{ROLE_LABELS[r]}</span>
+                    <Chip label={r} size="small" color={ROLE_COLORS[r] || 'default'} />
+                    <span>{ROLE_LABELS[r] || r}</span>
                   </Box>
                 </MenuItem>
               ))}
@@ -360,7 +406,27 @@ export default function Users() {
                 <MenuItem value={false}>Pasif (Devre Dışı)</MenuItem>
               </TextField>
             )}
-            {form.role === 'Staff' && (
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Kalan İzin Günü" type="number" fullWidth size="small"
+                value={form.kalanIzinGunu}
+                onChange={e => setForm({ ...form, kalanIzinGunu: e.target.value })}
+                inputProps={{ min: 0 }}
+              />
+              <TextField
+                label="Yenilenecek Gün" type="number" fullWidth size="small"
+                value={form.izinYenilenecekGun}
+                onChange={e => setForm({ ...form, izinYenilenecekGun: e.target.value })}
+                inputProps={{ min: 0 }}
+              />
+            </Stack>
+            <TextField
+              label="İzin Yenileme Tarihi" type="date" fullWidth size="small"
+              value={form.izinYenilemeTarihi}
+              onChange={e => setForm({ ...form, izinYenilemeTarihi: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+            />
+            {!MANAGER_ROLES.includes(form.role) && form.role !== 'Admin' && (
               <Autocomplete
                 multiple
                 options={allGroups}

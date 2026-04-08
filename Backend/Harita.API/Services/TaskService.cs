@@ -24,10 +24,13 @@ namespace Harita.API.Services
             return Guid.Parse(idClaim.Value);
         }
 
+        private static readonly string[] ManagerRoles = { "Admin", "Müdür", "Şef", "Manager" };
+
         private bool IsManager()
         {
-            var role = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
-            return role == "Manager" || role == "Admin";
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null) return false;
+            return ManagerRoles.Any(r => user.IsInRole(r));
         }
 
         private static TaskDto MapToDto(AppTask t) => new()
@@ -40,6 +43,10 @@ namespace Harita.API.Services
             DueDate         = t.DueDate,
             CreatedAt       = t.CreatedAt,
             CreatedByUserId = t.CreatedByUserId,
+            CreatedByName   = t.CreatedByUser != null
+                ? $"{t.CreatedByUser.Name} {t.CreatedByUser.Surname}"
+                : "",
+            IsHerkes        = t.IsHerkes,
             AssignedUsers   = t.Assignments?.Select(a => new AssignedUserDto
             {
                 Id         = a.User.Id,
@@ -48,9 +55,13 @@ namespace Harita.API.Services
             }).ToList() ?? new()
         };
 
-        public async Task<List<TaskDto>> GetAllAsync(string? status = null, string? priority = null)
+        public async Task<List<TaskDto>> GetAllAsync(string? status = null, string? priority = null, bool assignedToMe = false)
         {
+            var currentUserId = GetCurrentUserId();
+            var manager = IsManager();
+
             var query = _context.Tasks
+                .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .AsQueryable();
 
@@ -60,6 +71,24 @@ namespace Harita.API.Services
             if (!string.IsNullOrWhiteSpace(priority))
                 query = query.Where(t => t.Priority == priority);
 
+            // assignedToMe=true → sadece benim görevlerim (creator veya atanan)
+            if (assignedToMe)
+            {
+                query = query.Where(t =>
+                    t.IsHerkes ||
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
+            }
+            else if (!manager)
+            {
+                // Normal kullanıcı: sadece kendine atananlar, "herkes" görevleri, kendi oluşturduğu
+                query = query.Where(t =>
+                    t.IsHerkes ||
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
+            }
+            // Manager: tüm görevleri görür (filtre yok)
+
             var tasks = await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
             return tasks.Select(MapToDto).ToList();
         }
@@ -67,6 +96,7 @@ namespace Harita.API.Services
         public async Task<TaskDto?> GetByIdAsync(Guid id)
         {
             var t = await _context.Tasks
+                .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -76,23 +106,23 @@ namespace Harita.API.Services
         public async Task<TaskDto> CreateAsync(CreateTaskDto dto)
         {
             var currentUserId = GetCurrentUserId();
-            var isManager = IsManager();
 
             var task = new AppTask
             {
-                Title             = dto.Title,
-                Description       = dto.Description,
-                Status            = dto.Status,
-                Priority          = dto.Priority,
-                DueDate           = dto.DueDate,
-                CreatedByUserId   = currentUserId
+                Title           = dto.Title,
+                Description     = dto.Description,
+                Status          = dto.Status,
+                Priority        = dto.Priority,
+                DueDate         = dto.DueDate,
+                CreatedByUserId = currentUserId,
+                IsHerkes        = dto.IsHerkes
             };
 
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
 
-            // Herkes oluştururken atayabilir
-            await SetAssignmentsAsync(task.Id, dto.AssignedUserIds);
+            if (!dto.IsHerkes)
+                await SetAssignmentsAsync(task.Id, dto.AssignedUserIds);
 
             return await GetByIdAsync(task.Id) ?? MapToDto(task);
         }
@@ -111,11 +141,20 @@ namespace Harita.API.Services
             task.Status      = dto.Status;
             task.Priority    = dto.Priority;
             task.DueDate     = dto.DueDate;
+            task.IsHerkes    = dto.IsHerkes;
 
             await _context.SaveChangesAsync();
 
-            // Herkes atama listesini güncelleyebilir
-            await SetAssignmentsAsync(id, dto.AssignedUserIds);
+            if (dto.IsHerkes)
+            {
+                var existing = _context.TaskAssignments.Where(a => a.TaskId == id);
+                _context.TaskAssignments.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                await SetAssignmentsAsync(id, dto.AssignedUserIds);
+            }
 
             return await GetByIdAsync(id) ?? MapToDto(task);
         }
@@ -124,6 +163,11 @@ namespace Harita.API.Services
         {
             var task = await _context.Tasks.FindAsync(id);
             if (task == null) return false;
+
+            var currentUserId = GetCurrentUserId();
+            if (!IsManager() && task.CreatedByUserId != currentUserId)
+                throw new UnauthorizedAccessException("Bu görevi silemezsiniz.");
+
             _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
             return true;
@@ -131,7 +175,16 @@ namespace Harita.API.Services
 
         public async Task<TaskSummaryDto> GetSummaryAsync()
         {
-            var query = _context.Tasks.AsQueryable();
+            var currentUserId = GetCurrentUserId();
+            var manager = IsManager();
+
+            IQueryable<AppTask> query = _context.Tasks;
+
+            if (!manager)
+                query = query.Where(t =>
+                    t.IsHerkes ||
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
 
             var tasks = await query.ToListAsync();
             return new TaskSummaryDto
@@ -143,7 +196,48 @@ namespace Harita.API.Services
             };
         }
 
-        // Görevin atamalarını toptan güncelle (mevcut sil + yeni ekle)
+        public async Task<PagedResult<TaskDto>> GetPagedAsync(string? status, string? priority, string? search, Guid? assignedUserId, int page, int pageSize)
+        {
+            var currentUserId = GetCurrentUserId();
+            var manager = IsManager();
+
+            var query = _context.Tasks
+                .Include(t => t.CreatedByUser)
+                .Include(t => t.Assignments).ThenInclude(a => a.User)
+                .AsQueryable();
+
+            // Role-based visibility
+            if (!manager)
+                query = query.Where(t =>
+                    t.IsHerkes ||
+                    t.CreatedByUserId == currentUserId ||
+                    t.Assignments.Any(a => a.UserId == currentUserId));
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(t => t.Status == status);
+            if (!string.IsNullOrWhiteSpace(priority))
+                query = query.Where(t => t.Priority == priority);
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(t => t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
+            if (assignedUserId.HasValue)
+                query = query.Where(t => t.IsHerkes || t.CreatedByUserId == assignedUserId || t.Assignments.Any(a => a.UserId == assignedUserId));
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<TaskDto>
+            {
+                Items    = items.Select(MapToDto).ToList(),
+                Total    = total,
+                Page     = page,
+                PageSize = pageSize
+            };
+        }
+
         private async Task SetAssignmentsAsync(Guid taskId, List<Guid> userIds)
         {
             var existing = _context.TaskAssignments.Where(a => a.TaskId == taskId);

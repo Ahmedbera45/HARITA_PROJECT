@@ -23,8 +23,9 @@ const contactService = {
   update: async (id, data) => {
     const response = await api.put(`/Contact/${id}`, data);
     return response.data;
-  }
+  },
 
+  getPaged: (params) => api.get('/Contact/paged', { params }).then(r => r.data),
 };
 
 export default contactService;

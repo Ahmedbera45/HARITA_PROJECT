@@ -32,6 +32,32 @@ namespace Harita.API.Services
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<ContactDto>> GetPagedAsync(string? search, int page, int pageSize)
+        {
+            var query = _context.Contacts.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var q = search.ToLower();
+                query = query.Where(c =>
+                    c.FirstName.ToLower().Contains(q) ||
+                    c.LastName.ToLower().Contains(q) ||
+                    (c.Institution != null && c.Institution.ToLower().Contains(q)) ||
+                    (c.PhoneNumber != null && c.PhoneNumber.Contains(q)));
+            }
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(c => new ContactDto
+                {
+                    Id = c.Id, FirstName = c.FirstName, LastName = c.LastName,
+                    Title = c.Title, Institution = c.Institution, Department = c.Department,
+                    PhoneNumber = c.PhoneNumber, Email = c.Email, Description = c.Description
+                })
+                .ToListAsync();
+            return new PagedResult<ContactDto> { Items = items, Total = total, Page = page, PageSize = pageSize };
+        }
+
         public async Task<ContactDto?> GetByIdAsync(Guid id)
         {
             var c = await _context.Contacts.FindAsync(id);

@@ -40,6 +40,7 @@ namespace Harita.API.DTOs
         public string? PlanFonksiyonu { get; set; }
         public string? Geometry { get; set; }
         public string? ImportBatchId { get; set; }
+        public string? ExtraData { get; set; }
     }
 
     public class UpdateParcelDto
@@ -57,5 +58,26 @@ namespace Harita.API.DTOs
         public string? EskiAda { get; set; }
         public string? EskiParsel { get; set; }
         public string? PlanFonksiyonu { get; set; }
+        public string? ExtraData { get; set; }
+    }
+
+    public class CustomFieldDto
+    {
+        public string? FieldKey { get; set; }
+        public string? DisplayName { get; set; }
+        public string? FieldType { get; set; }
+        public int? SortOrder { get; set; }
+        public bool? IsActive { get; set; }
+    }
+
+    public class MergeImportResultDto
+    {
+        public string BatchId { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public int TotalRows { get; set; }
+        public int Inserted { get; set; }
+        public int Updated { get; set; }
+        public int Skipped { get; set; }
+        public List<string> Errors { get; set; } = new();
     }
 }

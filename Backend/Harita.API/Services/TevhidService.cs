@@ -24,10 +24,13 @@ namespace Harita.API.Services
             return Guid.Parse(claim!);
         }
 
+        private static readonly string[] ManagerRoles = { "Admin", "Müdür", "Şef", "Manager" };
+
         private bool IsManager()
         {
-            var role = _accessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
-            return role == "Manager" || role == "Admin";
+            var user = _accessor.HttpContext?.User;
+            if (user == null) return false;
+            return ManagerRoles.Any(r => user.IsInRole(r));
         }
 
         private static double Calc(double katsayi, double m2, decimal rayic) =>
@@ -80,6 +83,46 @@ namespace Harita.API.Services
 
             var list = await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
             return list.Select(t => Map(t, t.CreatedByUser, t.ReviewedByUser)).ToList();
+        }
+
+        public async Task<PagedResult<TevhidDto>> GetPagedAsync(
+            string? ada, string? parsel, string? mahalle, string? status,
+            DateTime? dateFrom, DateTime? dateTo, int page, int pageSize)
+        {
+            var userId = GetCurrentUserId();
+            var isManager = IsManager();
+
+            var query = _context.TevhidCalculations
+                .Include(t => t.CreatedByUser)
+                .Include(t => t.ReviewedByUser)
+                .AsQueryable();
+
+            if (!isManager)
+                query = query.Where(t => t.CreatedByUserId == userId);
+            if (!string.IsNullOrWhiteSpace(ada))
+                query = query.Where(t => t.Ada.Contains(ada));
+            if (!string.IsNullOrWhiteSpace(parsel))
+                query = query.Where(t => t.ParselNo.Contains(parsel));
+            if (!string.IsNullOrWhiteSpace(mahalle))
+                query = query.Where(t => t.Mahalle.Contains(mahalle));
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(t => t.Status == status);
+            if (dateFrom.HasValue)
+                query = query.Where(t => t.CreatedAt >= dateFrom.Value);
+            if (dateTo.HasValue)
+                query = query.Where(t => t.CreatedAt <= dateTo.Value.AddDays(1));
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<TevhidDto>
+            {
+                Items = items.Select(t => Map(t, t.CreatedByUser, t.ReviewedByUser)).ToList(),
+                Total = total, Page = page, PageSize = pageSize
+            };
         }
 
         public async Task<TevhidDto?> GetByIdAsync(Guid id)

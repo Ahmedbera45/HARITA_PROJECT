@@ -27,6 +27,10 @@ namespace Harita.API.Data
         public DbSet<UserPermissionGroup> UserPermissionGroups { get; set; }
         public DbSet<ImarPlan> ImarPlanlar { get; set; }
         public DbSet<ImarPlanEk> ImarPlanEkler { get; set; }
+        public DbSet<HourlyLeaveCompensation> HourlyLeaveCompensations { get; set; }
+        public DbSet<MapLayer> MapLayers { get; set; }
+        public DbSet<SystemSetting> SystemSettings { get; set; }
+        public DbSet<ParcelCustomField> ParcelCustomFields { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -54,9 +58,9 @@ namespace Harita.API.Data
                 .HasForeignKey(ta => ta.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Görev oluşturan kullanıcı
+            // Görev oluşturan kullanıcı (CreatedByUser navigation ile)
             modelBuilder.Entity<AppTask>()
-                .HasOne<User>()
+                .HasOne(t => t.CreatedByUser)
                 .WithMany(u => u.CreatedAppTasks)
                 .HasForeignKey(t => t.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -117,6 +121,19 @@ namespace Harita.API.Data
             modelBuilder.Entity<DynamicRow>()
                 .HasOne(r => r.Page).WithMany(p => p.Rows)
                 .HasForeignKey(r => r.PageId).OnDelete(DeleteBehavior.Cascade);
+
+            // Saatlik izin telafisi
+            modelBuilder.Entity<HourlyLeaveCompensation>()
+                .HasOne(h => h.User).WithMany()
+                .HasForeignKey(h => h.UserId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<HourlyLeaveCompensation>()
+                .HasOne(h => h.Ekleyen).WithMany()
+                .HasForeignKey(h => h.EkleyenId).OnDelete(DeleteBehavior.Restrict);
+
+            // Harita katmanları
+            modelBuilder.Entity<MapLayer>()
+                .HasOne(m => m.CreatedByUser).WithMany()
+                .HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
 
             // İmar Planları
             modelBuilder.Entity<ImarPlan>()

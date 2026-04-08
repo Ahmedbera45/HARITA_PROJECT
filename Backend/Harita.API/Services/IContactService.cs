@@ -5,6 +5,7 @@ namespace Harita.API.Services
     public interface IContactService
     {
         Task<List<ContactDto>> GetAllAsync();
+        Task<PagedResult<ContactDto>> GetPagedAsync(string? search, int page, int pageSize);
         
         // DİKKAT: Burası int idi, şimdi Guid yapıyoruz
         Task<ContactDto?> GetByIdAsync(Guid id); 

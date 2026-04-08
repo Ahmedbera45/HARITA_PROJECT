@@ -18,6 +18,7 @@ const imarPlanService = {
     URL.revokeObjectURL(url);
   },
   browse:     (path = '')     => api.get('/ImarPlan/browse', { params: { path } }).then(r => r.data),
+  getPaged:   (params)        => api.get('/ImarPlan/paged', { params }).then(r => r.data),
 };
 
 export default imarPlanService;

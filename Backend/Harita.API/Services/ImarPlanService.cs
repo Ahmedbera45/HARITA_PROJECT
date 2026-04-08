@@ -16,7 +16,11 @@ public class ImarPlanService : IImarPlanService
         _configuration = configuration;
     }
 
-    private string BasePath => _configuration["NetworkStorage:BasePath"] ?? @"C:\ImarArsiv";
+    private string GetBasePath()
+    {
+        var setting = _context.SystemSettings.FirstOrDefault(s => s.Key == "NetworkStorageBasePath");
+        return setting?.Value ?? _configuration["NetworkStorage:BasePath"] ?? @"C:\ImarArsiv";
+    }
 
     private static ImarPlanEkDto MapEk(ImarPlanEk e) => new()
     {
@@ -58,6 +62,39 @@ public class ImarPlanService : IImarPlanService
             .OrderByDescending(p => p.OnayTarihi ?? p.CreatedAt)
             .ToListAsync();
         return plans.Select(MapPlan).ToList();
+    }
+
+    public async Task<PagedResult<ImarPlanDto>> GetPagedAsync(string? search, string? planTuru, string? durum, int? yil, int page, int pageSize)
+    {
+        var query = _context.ImarPlanlar
+            .Where(p => !p.IsDeleted)
+            .Include(p => p.CreatedByUser)
+            .Include(p => p.Ekler).ThenInclude(e => e.Ekleyen)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(p => p.PlanNo.Contains(search) || p.PlanAdi.Contains(search) || (p.Mahalle != null && p.Mahalle.Contains(search)));
+        if (!string.IsNullOrWhiteSpace(planTuru))
+            query = query.Where(p => p.PlanTuru == planTuru);
+        if (!string.IsNullOrWhiteSpace(durum))
+            query = query.Where(p => p.Durum == durum);
+        if (yil.HasValue)
+            query = query.Where(p => (p.OnayTarihi ?? p.CreatedAt).Year == yil.Value);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(p => p.OnayTarihi ?? p.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<ImarPlanDto>
+        {
+            Items    = items.Select(MapPlan).ToList(),
+            Total    = total,
+            Page     = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<ImarPlanDto?> GetByIdAsync(Guid id)
@@ -163,7 +200,7 @@ public class ImarPlanService : IImarPlanService
 
     public NetworkBrowseResultDto BrowseNetwork(string relativePath)
     {
-        var basePath = BasePath;
+        var basePath = GetBasePath();
 
         // Create base directory if it doesn't exist (development convenience)
         if (!Directory.Exists(basePath))
@@ -229,9 +266,9 @@ public class ImarPlanService : IImarPlanService
             ?? throw new Exception("Ek bulunamadı.");
         if (ek.IsDeleted) throw new Exception("Ek bulunamadı.");
 
-        var fullPath = Path.Combine(BasePath, ek.DosyaYolu);
+        var fullPath = Path.Combine(GetBasePath(), ek.DosyaYolu);
         var fullNorm = Path.GetFullPath(fullPath);
-        var baseNorm = Path.GetFullPath(BasePath);
+        var baseNorm = Path.GetFullPath(GetBasePath());
 
         if (!fullNorm.StartsWith(baseNorm, StringComparison.OrdinalIgnoreCase))
             throw new UnauthorizedAccessException("Geçersiz yol.");

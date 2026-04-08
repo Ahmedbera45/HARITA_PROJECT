@@ -238,3 +238,5 @@ C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\backend\Harita.API\obj\Debug\
 C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\Backend\Harita.API\bin\Debug\net8.0\NetTopologySuite.dll
 C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\Backend\Harita.API\bin\Debug\net8.0\NetTopologySuite.Features.dll
 C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\Backend\Harita.API\bin\Debug\net8.0\NetTopologySuite.IO.ShapeFile.dll
+C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\Backend\Harita.API\bin\Debug\net8.0\NetTopologySuite.IO.GeoJSON.dll
+C:\Users\ahmet.cakmak\HaritaProject\HARITA_PROJECT\Backend\Harita.API\bin\Debug\net8.0\Newtonsoft.Json.dll

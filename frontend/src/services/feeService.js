@@ -18,6 +18,7 @@ const feeService = {
   getAll: () => api.get('/FeeCalculation').then(r => r.data),
   getById: (id) => api.get(`/FeeCalculation/${id}`).then(r => r.data),
   delete: (id) => api.delete(`/FeeCalculation/${id}`).then(r => r.data),
+  getPaged: (params) => api.get('/FeeCalculation/paged', { params }).then(r => r.data),
 };
 
 export default feeService;

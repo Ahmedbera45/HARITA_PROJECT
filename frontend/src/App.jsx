@@ -5,7 +5,7 @@ import Dashboard from './pages/Dashboard';
 import MainLayout from './layouts/MainLayout';
 import Directory from './pages/Directory';
 import Tasks from './pages/Tasks';
-import ComingSoon from './pages/ComingSoon';
+import AllTasks from './pages/AllTasks';
 import Leaves from './pages/Leaves';
 import Import from './pages/Import';
 import FeeCalculation from './pages/FeeCalculation';
@@ -16,12 +16,16 @@ import DynamicPageDetail from './pages/DynamicPageDetail';
 import DynamicPageCreate from './pages/DynamicPageCreate';
 import PermissionGroups from './pages/PermissionGroups';
 import ImarPlanlari from './pages/ImarPlanlari';
-import { useAuth } from './hooks/useAuth';
+import Approvals from './pages/Approvals';
+import Map from './pages/Map';
+import Settings from './pages/Settings';
+import { useAuth, MANAGER_ROLES } from './hooks/useAuth';
 
-// Token var mı kontrolü
+// Token var ve süresi dolmamış mı kontrolü
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
 }
 
 // Rol bazlı rota koruması: yetkisizse /dashboard'a yönlendir
@@ -49,42 +53,51 @@ function App() {
           <Route path="/directory" element={<Directory />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/leaves" element={<Leaves />} />
-          <Route path="/map" element={<ComingSoon title="Harita / CBS" />} />
-
-          {/* Tüm roller — veri yükleme ve harç hesaplama */}
           <Route path="/import" element={<Import />} />
           <Route path="/fee-calculation" element={<FeeCalculation />} />
           <Route path="/tevhid" element={<TevhidCalculation />} />
+          <Route path="/imar-planlari" element={<ImarPlanlari />} />
+          <Route path="/map" element={<Map />} />
 
-          {/* /pages/:id — herkes kendi sayfasını görür (menüden tıklayarak gelir) */}
+          {/* Dinamik sayfalar */}
           <Route path="/pages/:id" element={<DynamicPageDetail />} />
 
-          {/* /pages ve /pages/create — sadece yönetici */}
+          {/* Yönetici (Müdür, Şef, Admin) sayfaları */}
+          <Route path="/approvals" element={
+            <RoleRoute roles={['Admin', 'Müdür', 'Şef']}>
+              <Approvals />
+            </RoleRoute>
+          } />
+          <Route path="/all-tasks" element={
+            <RoleRoute roles={['Admin', 'Müdür', 'Şef']}>
+              <AllTasks />
+            </RoleRoute>
+          } />
           <Route path="/pages" element={
-            <RoleRoute roles={['Admin', 'Manager']}>
+            <RoleRoute roles={['Admin', 'Müdür', 'Şef']}>
               <DynamicPages />
             </RoleRoute>
           } />
           <Route path="/pages/create" element={
-            <RoleRoute roles={['Admin', 'Manager']}>
+            <RoleRoute roles={['Admin', 'Müdür', 'Şef']}>
               <DynamicPageCreate />
             </RoleRoute>
           } />
-
-          {/* Sadece Admin + Manager */}
           <Route path="/users" element={
-            <RoleRoute roles={['Admin', 'Manager']}>
+            <RoleRoute roles={['Admin', 'Müdür', 'Şef']}>
               <Users />
             </RoleRoute>
           } />
-
-          {/* İmar Planları — tüm roller (canView kontrolü MainLayout'ta) */}
-          <Route path="/imar-planlari" element={<ImarPlanlari />} />
 
           {/* Sadece Admin */}
           <Route path="/permissions" element={
             <RoleRoute roles={['Admin']}>
               <PermissionGroups />
+            </RoleRoute>
+          } />
+          <Route path="/settings" element={
+            <RoleRoute roles={['Admin']}>
+              <Settings />
             </RoleRoute>
           } />
         </Route>

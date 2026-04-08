@@ -4,7 +4,7 @@ import {
   Chip, IconButton, Dialog, DialogTitle, DialogContent,
   TextField, DialogActions, MenuItem, Tooltip, DialogContentText,
   Stack, FormControl, InputLabel, Select, OutlinedInput, Checkbox,
-  ListItemText, AvatarGroup, Avatar
+  ListItemText, AvatarGroup, Avatar, Switch, FormControlLabel
 } from '@mui/material';
 import {
   Add, Delete, Edit, ArrowForward, ArrowBack,
@@ -37,7 +37,7 @@ const PRIORITY_COLORS = { Düşük: 'success', Orta: 'warning', Yüksek: 'error'
 
 const EMPTY_FORM = {
   title: '', description: '', priority: 'Orta', status: 'Bekliyor',
-  dueDate: '', assignedUserIds: []
+  dueDate: '', assignedUserIds: [], isHerkes: false
 };
 
 export default function Tasks() {
@@ -99,7 +99,8 @@ export default function Tasks() {
       priority: task.priority,
       status: task.status,
       dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-      assignedUserIds: task.assignedUsers?.map(u => u.id) ?? []
+      assignedUserIds: task.assignedUsers?.map(u => u.id) ?? [],
+      isHerkes: task.isHerkes ?? false
     });
     setSelectedId(task.id);
     setIsEdit(true);
@@ -112,7 +113,8 @@ export default function Tasks() {
     status: fd.status,
     priority: fd.priority,
     dueDate: fd.dueDate || null,
-    assignedUserIds: fd.assignedUserIds ?? []
+    assignedUserIds: fd.isHerkes ? [] : (fd.assignedUserIds ?? []),
+    isHerkes: fd.isHerkes ?? false
   });
 
   const handleSave = async () => {
@@ -171,7 +173,8 @@ export default function Tasks() {
           status: newStatus,
           priority: task.priority,
           dueDate: task.dueDate ? task.dueDate.split('T')[0] : null,
-          assignedUserIds: task.assignedUsers?.map(u => u.id) ?? []
+          assignedUserIds: task.isHerkes ? [] : (task.assignedUsers?.map(u => u.id) ?? []),
+          isHerkes: task.isHerkes ?? false
         });
       } catch (e) {
         toast.error(e.response?.data?.message || 'Durum güncellenemedi.');
@@ -183,7 +186,10 @@ export default function Tasks() {
   // Atanan kişi filtrelemesi frontend'de yapılır
   const filteredTasks = (statusKey) => tasks.filter(t => {
     if (t.status !== statusKey) return false;
-    if (filterAssignee && !t.assignedUsers?.some(u => u.id === filterAssignee)) return false;
+    if (filterAssignee) {
+      if (filterAssignee === 'herkes') { if (!t.isHerkes) return false; }
+      else if (!t.assignedUsers?.some(u => u.id === filterAssignee)) return false;
+    }
     return true;
   });
 
@@ -216,19 +222,26 @@ export default function Tasks() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, pt: 1, borderTop: '1px solid #eee' }}>
-                  {task.assignedUsers && task.assignedUsers.length > 0 ? (
-                    <Tooltip title={task.assignedUsers.map(u => u.fullName).join(', ')}>
-                      <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: '0.65rem' } }}>
-                        {task.assignedUsers.map(u => (
-                          <Avatar key={u.id} sx={{ bgcolor: stringToColor(u.fullName), width: 24, height: 24, fontSize: '0.65rem' }}>
-                            {(u.fullName || '?')[0]}
-                          </Avatar>
-                        ))}
-                      </AvatarGroup>
-                    </Tooltip>
-                  ) : (
-                    <Typography variant="caption" color="text.disabled">Atanmamış</Typography>
-                  )}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    {task.isHerkes ? (
+                      <Chip size="small" label="Herkes" color="secondary" sx={{ width: 'fit-content' }} />
+                    ) : task.assignedUsers && task.assignedUsers.length > 0 ? (
+                      <Tooltip title={task.assignedUsers.map(u => u.fullName).join(', ')}>
+                        <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 24, height: 24, fontSize: '0.65rem' } }}>
+                          {task.assignedUsers.map(u => (
+                            <Avatar key={u.id} sx={{ bgcolor: stringToColor(u.fullName), width: 24, height: 24, fontSize: '0.65rem' }}>
+                              {(u.fullName || '?')[0]}
+                            </Avatar>
+                          ))}
+                        </AvatarGroup>
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="caption" color="text.disabled">Atanmamış</Typography>
+                    )}
+                    {task.createdByName && (
+                      <Typography variant="caption" color="text.secondary">↑ {task.createdByName}</Typography>
+                    )}
+                  </Box>
 
                   <Box>
                     {statusKey !== 'Bekliyor' && (
@@ -289,6 +302,7 @@ export default function Tasks() {
             sx={{ minWidth: 160, height: 32 }}
           >
             <MenuItem value=""><em>Tümü</em></MenuItem>
+            <MenuItem value="herkes">Herkes</MenuItem>
             {users.map(u => (
               <MenuItem key={u.id} value={u.id}>{u.fullName}</MenuItem>
             ))}
@@ -345,24 +359,38 @@ export default function Tasks() {
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth>
-                <InputLabel>Atanan Kişiler</InputLabel>
-                <Select multiple value={formData.assignedUserIds}
-                  onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
-                  input={<OutlinedInput label="Atanan Kişiler" />}
-                  renderValue={(selected) =>
-                    users.filter(u => selected.includes(u.id)).map(u => u.fullName).join(', ') || '— Seçilmedi —'
-                  }
-                >
-                  {users.map(u => (
-                    <MenuItem key={u.id} value={u.id}>
-                      <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
-                      <ListItemText primary={u.fullName} secondary={u.department} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.isHerkes}
+                    onChange={(e) => setFormData({ ...formData, isHerkes: e.target.checked, assignedUserIds: [] })}
+                    color="secondary"
+                  />
+                }
+                label="Herkese Ata (tüm kullanıcılar görür)"
+              />
             </Grid>
+            {!formData.isHerkes && (
+              <Grid size={{ xs: 12 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Atanan Kişiler</InputLabel>
+                  <Select multiple value={formData.assignedUserIds}
+                    onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
+                    input={<OutlinedInput label="Atanan Kişiler" />}
+                    renderValue={(selected) =>
+                      users.filter(u => selected.includes(u.id)).map(u => u.fullName).join(', ') || '— Seçilmedi —'
+                    }
+                  >
+                    {users.map(u => (
+                      <MenuItem key={u.id} value={u.id}>
+                        <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
+                        <ListItemText primary={u.fullName} secondary={u.department} />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>

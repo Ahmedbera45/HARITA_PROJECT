@@ -38,9 +38,11 @@ import {
   SettingsApplications as ManageIcon,
   Lock as LockIcon,
   AccountBalance as ImarIcon,
+  Approval as ApprovalIcon,
+  FormatListBulleted as AllTasksIcon,
 } from '@mui/icons-material';
 import { logout } from '../services/authService';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, MANAGER_ROLES } from '../hooks/useAuth';
 import dynamicPageService from '../services/dynamicPageService';
 import logo from '../assets/logo.png';
 
@@ -51,30 +53,38 @@ const DRAWER_WIDTH = 260;
 // module: varsa Staff için canView kontrolü yapılır
 const STATIC_MENU_ITEMS = [
   { text: 'Ana Sayfa',       icon: <DashboardIcon />,  path: '/dashboard',       roles: [] },
-  { text: 'Kurum Rehberi',   icon: <PeopleIcon />,     path: '/directory',       roles: [],                    module: 'rehber' },
-  { text: 'Görev Takip',     icon: <AssignmentIcon />, path: '/tasks',           roles: [],                    module: 'gorev' },
-  { text: 'İzin Yönetimi',   icon: <LeaveIcon />,      path: '/leaves',          roles: [],                    module: 'izin' },
-  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',          roles: [],                    module: 'veriYukleme' },
-  { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation', roles: [],                    module: 'harc' },
-  { text: 'Tevhid Harcı',    icon: <TevhidIcon />,     path: '/tevhid',          roles: [],                    module: 'tevhid' },
-  { text: 'İmar Planları',   icon: <ImarIcon />,        path: '/imar-planlari',   roles: [],                    module: 'imarPlanlari' },
-  { text: 'Harita / CBS',    icon: <MapIcon />,         path: '/map',             roles: [] },
+  { text: 'Kurum Rehberi',   icon: <PeopleIcon />,     path: '/directory',       roles: [],                                   module: 'rehber' },
+  { text: 'Görev Takip',     icon: <AssignmentIcon />, path: '/tasks',           roles: [],                                   module: 'gorev' },
+  { text: 'Tüm Görevler',    icon: <AllTasksIcon />,   path: '/all-tasks',       roles: ['Admin', 'Müdür', 'Şef'] },
+  { text: 'İzin Yönetimi',   icon: <LeaveIcon />,      path: '/leaves',          roles: [],                                   module: 'izin' },
+  { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',          roles: [],                                   module: 'veriYukleme' },
+  { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation', roles: [],                                   module: 'harc' },
+  { text: 'Tevhid Harcı',    icon: <TevhidIcon />,     path: '/tevhid',          roles: [],                                   module: 'tevhid' },
+  { text: 'İmar Planları',   icon: <ImarIcon />,        path: '/imar-planlari',   roles: [],                                   module: 'imarPlanlari' },
+  { text: 'Harita / CBS',    icon: <MapIcon />,         path: '/map',             roles: [],                                   module: 'map' },
   // Yönetici menüleri
-  { text: 'Sayfa Yönetimi',  icon: <ManageIcon />,     path: '/pages',           roles: ['Admin', 'Manager'] },
-  { text: 'Kullanıcı Yön.', icon: <AdminIcon />,       path: '/users',           roles: ['Admin', 'Manager'] },
+  { text: 'Onaylar',         icon: <ApprovalIcon />,   path: '/approvals',       roles: ['Admin', 'Müdür', 'Şef'] },
+  { text: 'Sayfa Yönetimi',  icon: <ManageIcon />,     path: '/pages',           roles: ['Admin', 'Müdür', 'Şef'] },
+  { text: 'Kullanıcı Yön.', icon: <AdminIcon />,       path: '/users',           roles: ['Admin', 'Müdür', 'Şef'] },
   { text: 'Yetki Grupları',  icon: <LockIcon />,        path: '/permissions',     roles: ['Admin'] },
+  { text: 'Sistem Ayarları', icon: <ManageIcon />,      path: '/settings',        roles: ['Admin'] },
 ];
 
 function parseJwtUser() {
   try {
     const token = localStorage.getItem('token');
-    if (!token) return { name: '', department: '' };
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (!token) return { name: '', department: '', role: '' };
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    const payload = JSON.parse(jsonPayload);
     const fullName = payload['FullName'] || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || '';
     const department = payload['Department'] || '';
-    return { name: fullName, department };
+    const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || payload['role'] || '';
+    return { name: fullName, department, role };
   } catch {
-    return { name: '', department: '' };
+    return { name: '', department: '', role: '' };
   }
 }
 
@@ -193,12 +203,12 @@ export default function MainLayout() {
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-              <Typography variant="subtitle2" fontWeight="bold">{currentUser.name || 'Kullanıcı'}</Typography>
-              <Typography variant="caption" color="text.secondary">{currentUser.department}</Typography>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ fontFamily: 'inherit' }}>{currentUser.name || 'Kullanıcı'}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'inherit' }}>{currentUser.role || currentUser.department}</Typography>
             </Box>
             <IconButton onClick={handleMenuOpen} sx={{ p: 0.5, border: '1px solid', borderColor: 'divider' }}>
-              <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>
-                {(currentUser.name || 'K')[0]}
+              <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32, fontFamily: 'inherit' }}>
+                {(currentUser.name || 'K')[0].toUpperCase()}
               </Avatar>
             </IconButton>
             <Menu

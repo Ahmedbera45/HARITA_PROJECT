@@ -25,8 +25,21 @@ namespace Harita.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("paged")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] string? search,
+            [FromQuery] string? role,
+            [FromQuery] bool? isActive,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _userService.GetPagedAsync(search, role, isActive, page, pageSize);
+            return Ok(result);
+        }
+
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var result = await _userService.GetByIdAsync(id);
@@ -36,7 +49,7 @@ namespace Harita.API.Controllers
 
         // Yeni kullanıcı oluştur — Sadece Admin
         [HttpPost]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Create(CreateUserDto dto)
         {
             try
@@ -52,7 +65,7 @@ namespace Harita.API.Controllers
 
         // Kullanıcı güncelle (bilgi + rol) — Sadece Admin
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Update(Guid id, UpdateUserDto dto)
         {
             try
@@ -68,7 +81,7 @@ namespace Harita.API.Controllers
 
         // Kullanıcı sil (soft delete) — Sadece Admin
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Delete(Guid id)
         {
             try
@@ -85,7 +98,7 @@ namespace Harita.API.Controllers
 
         // Şifre sıfırla — Sadece Admin
         [HttpPut("{id}/password")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> ChangePassword(Guid id, ChangePasswordDto dto)
         {
             try

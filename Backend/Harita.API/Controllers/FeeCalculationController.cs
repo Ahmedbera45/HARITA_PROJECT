@@ -29,7 +29,7 @@ namespace Harita.API.Controllers
 
         // POST api/feecalculation/categories
         [HttpPost("categories")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> CreateCategory([FromBody] CreateFeeCategoryDto dto)
         {
             try
@@ -45,7 +45,7 @@ namespace Harita.API.Controllers
 
         // PUT api/feecalculation/categories/{id}
         [HttpPut("categories/{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> UpdateCategory(Guid id, [FromBody] CreateFeeCategoryDto dto)
         {
             try
@@ -61,7 +61,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/feecalculation/categories/{id}
         [HttpDelete("categories/{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> DeleteCategory(Guid id)
         {
             var deleted = await _service.DeleteCategoryAsync(id);
@@ -81,7 +81,7 @@ namespace Harita.API.Controllers
 
         // POST api/feecalculation/rates
         [HttpPost("rates")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> CreateRate([FromBody] CreateFeeRateDto dto)
         {
             try
@@ -97,7 +97,7 @@ namespace Harita.API.Controllers
 
         // PUT api/feecalculation/rates/{id}
         [HttpPut("rates/{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> UpdateRate(Guid id, [FromBody] UpdateFeeRateDto dto)
         {
             try
@@ -113,7 +113,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/feecalculation/rates/{id}
         [HttpDelete("rates/{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> DeleteRate(Guid id)
         {
             var deleted = await _service.DeleteFeeRateAsync(id);
@@ -138,6 +138,14 @@ namespace Harita.API.Controllers
             }
         }
 
+        // GET api/feecalculation/paged
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _service.GetPagedAsync(page, pageSize);
+            return Ok(result);
+        }
+
         // GET api/feecalculation
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -157,7 +165,7 @@ namespace Harita.API.Controllers
 
         // DELETE api/feecalculation/{id}
         [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var deleted = await _service.DeleteAsync(id);

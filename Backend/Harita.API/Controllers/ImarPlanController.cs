@@ -29,6 +29,20 @@ public class ImarPlanController : ControllerBase
         return Ok(result);
     }
 
+    // GET /api/ImarPlan/paged
+    [HttpGet("paged")]
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] string? search,
+        [FromQuery] string? planTuru,
+        [FromQuery] string? durum,
+        [FromQuery] int? yil,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _service.GetPagedAsync(search, planTuru, durum, yil, page, pageSize);
+        return Ok(result);
+    }
+
     // GET /api/ImarPlan/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
@@ -64,7 +78,7 @@ public class ImarPlanController : ControllerBase
 
     // DELETE /api/ImarPlan/{id}
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Müdür,Şef")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var ok = await _service.DeleteAsync(id);

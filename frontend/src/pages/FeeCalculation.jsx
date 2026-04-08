@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, TextField, MenuItem, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
   Alert, Chip, Divider, IconButton, Tooltip, Switch, FormControlLabel,
-  Stack, ListSubheader, Select, FormControl, InputLabel,
+  Stack, ListSubheader, Select, FormControl, InputLabel, Autocomplete,
 } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -17,6 +17,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import feeService from '../services/feeService';
 import importService from '../services/importService';
 import { useAuth } from '../hooks/useAuth';
+import PaginationBar from '../components/PaginationBar';
 
 const formatCurrency = (val) =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
@@ -33,6 +34,9 @@ export default function FeeCalculation() {
   const [rates, setRates] = useState([]);
   const [categories, setCategories] = useState([]);
   const [history, setHistory] = useState([]);
+  const [histTotal, setHistTotal] = useState(0);
+  const [histPage, setHistPage] = useState(1);
+  const [histPageSize, setHistPageSize] = useState(20);
   const [loading, setLoading] = useState(false);
   const [histLoading, setHistLoading] = useState(true);
   const [error, setError] = useState('');
@@ -68,14 +72,16 @@ export default function FeeCalculation() {
   const [searchParsel, setSearchParsel] = useState('');
   const [searchMahalle, setSearchMahalle] = useState('');
   const [searching, setSearching] = useState(false);
+  const [adaOptions, setAdaOptions] = useState([]);
+  const [parselOptions, setParselOptions] = useState([]);
+  const [mahalleOptions, setMahalleOptions] = useState([]);
+
+  const fetchAC = useCallback((field, q, setter) => {
+    if (!q || q.length < 2) { setter([]); return; }
+    importService.autocomplete(q, field).then(setter).catch(() => setter([]));
+  }, []);
 
   const printRef = useRef();
-
-  useEffect(() => {
-    loadRates();
-    loadCategories();
-    loadHistory();
-  }, []);
 
   const loadRates = () => {
     feeService.getRates()
@@ -89,13 +95,20 @@ export default function FeeCalculation() {
       .catch(() => {});
   };
 
-  const loadHistory = () => {
+  const loadHistory = useCallback(() => {
     setHistLoading(true);
-    feeService.getAll()
-      .then(setHistory)
-      .catch(() => {})
+    feeService.getPaged({ page: histPage, pageSize: histPageSize })
+      .then(r => { setHistory(r.items ?? []); setHistTotal(r.total ?? 0); })
+      .catch(() => { setHistory([]); setHistTotal(0); })
       .finally(() => setHistLoading(false));
-  };
+  }, [histPage, histPageSize]);
+
+  useEffect(() => {
+    loadRates();
+    loadCategories();
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const activeRates = rates.filter(r => r.isActive);
   const selectedRate = activeRates.find(r => r.harcTuru === form.harcTuru);
@@ -313,18 +326,30 @@ export default function FeeCalculation() {
                 Parselden Otomatik Getir
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                <TextField size="small" label="Ada" value={searchAda}
-                  onChange={e => setSearchAda(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
-                  sx={{ width: 80 }} />
-                <TextField size="small" label="Parsel" value={searchParsel}
-                  onChange={e => setSearchParsel(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
-                  sx={{ width: 80 }} />
-                <TextField size="small" label="Mahalle (opsiyonel)" value={searchMahalle}
-                  onChange={e => setSearchMahalle(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleParcelSearch()}
-                  sx={{ width: 160 }} />
+                <Autocomplete
+                  freeSolo size="small"
+                  options={adaOptions}
+                  inputValue={searchAda}
+                  onInputChange={(_, v) => { setSearchAda(v); fetchAC('ada', v, setAdaOptions); }}
+                  sx={{ width: 100 }}
+                  renderInput={p => <TextField {...p} label="Ada" onKeyDown={e => e.key === 'Enter' && handleParcelSearch()} />}
+                />
+                <Autocomplete
+                  freeSolo size="small"
+                  options={parselOptions}
+                  inputValue={searchParsel}
+                  onInputChange={(_, v) => { setSearchParsel(v); fetchAC('parsel', v, setParselOptions); }}
+                  sx={{ width: 100 }}
+                  renderInput={p => <TextField {...p} label="Parsel" onKeyDown={e => e.key === 'Enter' && handleParcelSearch()} />}
+                />
+                <Autocomplete
+                  freeSolo size="small"
+                  options={mahalleOptions}
+                  inputValue={searchMahalle}
+                  onInputChange={(_, v) => { setSearchMahalle(v); fetchAC('mahalle', v, setMahalleOptions); }}
+                  sx={{ width: 180 }}
+                  renderInput={p => <TextField {...p} label="Mahalle (opsiyonel)" onKeyDown={e => e.key === 'Enter' && handleParcelSearch()} />}
+                />
                 <Button size="small" variant="contained" color="secondary"
                   startIcon={searching ? null : <SearchIcon />}
                   onClick={handleParcelSearch} disabled={searching} sx={{ whiteSpace: 'nowrap' }}>
@@ -655,6 +680,7 @@ export default function FeeCalculation() {
                     ))}
                   </TableBody>
                 </Table>
+                <PaginationBar total={histTotal} page={histPage} pageSize={histPageSize} onPageChange={setHistPage} onPageSizeChange={(s) => { setHistPageSize(s); setHistPage(1); }} />
               </TableContainer>
             )}
           </Paper>
