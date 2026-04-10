@@ -110,6 +110,33 @@ namespace Harita.API.Controllers
             return NoContent();
         }
 
+        // PUT api/Tevhid/{id}/resubmit
+        [HttpPut("{id:guid}/resubmit")]
+        public async Task<IActionResult> Resubmit(Guid id)
+        {
+            try
+            {
+                var result = await _service.ResubmitAsync(id);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex) { return Forbid(); }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        // POST api/Tevhid/{id}/upload
+        [HttpPost("{id:guid}/upload")]
+        [Authorize(Roles = "Admin,Müdür,Şef")]
+        [RequestSizeLimit(20 * 1024 * 1024)]
+        public async Task<IActionResult> UploadFile(Guid id, IFormFile file)
+        {
+            try
+            {
+                var result = await _service.UploadFileAsync(id, file);
+                return Ok(result);
+            }
+            catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
         // GET api/Tevhid/export/approved
         [HttpGet("export/approved")]
         [Authorize(Roles = "Admin,Müdür,Şef")]

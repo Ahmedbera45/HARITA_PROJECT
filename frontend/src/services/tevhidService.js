@@ -10,6 +10,16 @@ const tevhidService = {
 
   getPaged: (params) => api.get('/Tevhid/paged', { params }).then(r => r.data),
 
+  resubmit: (id) => api.put(`/Tevhid/${id}/resubmit`).then(r => r.data),
+
+  uploadFile: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/Tevhid/${id}/upload`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+
   exportAllApproved: () =>
     api.get('/Tevhid/export/approved', { responseType: 'blob' }),
   exportScenarios: (id) =>

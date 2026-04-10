@@ -3,16 +3,17 @@ import {
   Box, Typography, Paper, Grid, TextField, Button, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
-  Alert, Chip, Divider, IconButton, Tooltip, Radio, RadioGroup,
-  FormControlLabel, FormLabel, Stack, Autocomplete,
+  Alert, Chip, Divider, IconButton, Tooltip, Stack, Autocomplete,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import GavelIcon from '@mui/icons-material/Gavel';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ReplayIcon from '@mui/icons-material/Replay';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import tevhidService from '../services/tevhidService';
 import importService from '../services/importService';
 import { useAuth } from '../hooks/useAuth';
@@ -31,10 +32,11 @@ const statusColor = (s) => {
   return 'warning';
 };
 
+const EMPTY_PARSEL = { ada: '', parselNo: '', mahalle: '', eskiAda: '', eskiParsel: '', malikAdi: '', planFonksiyonu: '', parcelId: null };
+
 const EMPTY_FORM = {
-  parcelId: null,
-  ada: '', parselNo: '', mahalle: '', eskiAda: '', eskiParsel: '',
-  malikAdi: '', planFonksiyonu: '', katsayi: '', rayicBedel: '', arsaM2: '', taksM2: '', cekmelerM2: '',
+  parseller: [{ ...EMPTY_PARSEL }],
+  katsayi: '', rayicBedel: '', arsaM2: '', taksM2: '', cekmelerM2: '',
   notlar: '',
 };
 
@@ -46,7 +48,7 @@ function calcHarc(katsayi, m2, rayic) {
 }
 
 export default function TevhidCalculation() {
-  const { isManager } = useAuth();
+  const { isManager, user } = useAuth();
 
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
@@ -63,14 +65,15 @@ export default function TevhidCalculation() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Parsel arama (form içinde)
-  const [searchAda, setSearchAda] = useState('');
-  const [searchParsel, setSearchParsel] = useState('');
-  const [searchMahalle, setSearchMahalle] = useState('');
-  const [searching, setSearching] = useState(false);
+  // Dosya yükleme
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Parsel arama autocomplete options (per row: index → options)
   const [adaOptions, setAdaOptions] = useState([]);
   const [parselOptions, setParselOptions] = useState([]);
   const [mahalleOptions, setMahalleOptions] = useState([]);
+  const [searchingIdx, setSearchingIdx] = useState(null);
 
   const fetchAC = useCallback((field, q, setter) => {
     if (!q || q.length < 2) { setter([]); return; }
@@ -80,13 +83,6 @@ export default function TevhidCalculation() {
   // Detay dialog
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-
-  // İnceleme (review) dialog
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [reviewTarget, setReviewTarget] = useState(null);
-  const [reviewForm, setReviewForm] = useState({ decision: 'Onaylandı', onaylananSenaryo: '', reviewNote: '' });
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewError, setReviewError] = useState('');
 
   // Silme
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
@@ -119,34 +115,61 @@ export default function TevhidCalculation() {
 
   const handleFilterChange = (setter) => (val) => { setter(val); setPage(1); };
 
-  // ── Parsel arama ──────────────────────────────────────────────────
-  const handleParcelSearch = async () => {
-    if (!searchAda.trim() || !searchParsel.trim()) return;
-    setSearching(true);
+  // ── Çoklu Parsel ──────────────────────────────────────────────────
+  const updateParsel = (idx, field, val) => {
+    setForm(f => {
+      const arr = [...f.parseller];
+      arr[idx] = { ...arr[idx], [field]: val };
+      return { ...f, parseller: arr };
+    });
+  };
+
+  const addParsel = () => setForm(f => ({ ...f, parseller: [...f.parseller, { ...EMPTY_PARSEL }] }));
+
+  const removeParsel = (idx) => {
+    if (form.parseller.length <= 1) return;
+    setForm(f => ({ ...f, parseller: f.parseller.filter((_, i) => i !== idx) }));
+  };
+
+  const handleParcelSearch = async (idx) => {
+    const p = form.parseller[idx];
+    if (!p.ada.trim() || !p.parselNo.trim()) return;
+    setSearchingIdx(idx);
     try {
-      const p = await importService.searchParcel(searchAda.trim(), searchParsel.trim(), searchMahalle.trim() || undefined);
-      if (p) {
-        setForm(f => ({
-          ...f,
-          parcelId: p.id,
-          ada: p.ada || '',
-          parselNo: p.parsel || '',
-          mahalle: p.mahalle || '',
-          eskiAda: p.eskiAda || '',
-          eskiParsel: p.eskiParsel || '',
-          malikAdi: p.malikAdi || '',
-          planFonksiyonu: p.planFonksiyonu || '',
-          rayicBedel: p.rayicBedel ? String(p.rayicBedel) : f.rayicBedel,
-          arsaM2: p.alan ? String(p.alan) : f.arsaM2,
-        }));
+      const found = await importService.searchParcel(p.ada.trim(), p.parselNo.trim(), p.mahalle.trim() || undefined);
+      if (found) {
+        setForm(f => {
+          const arr = [...f.parseller];
+          arr[idx] = {
+            ...arr[idx],
+            parcelId: found.id,
+            ada: found.ada || arr[idx].ada,
+            parselNo: found.parsel || arr[idx].parselNo,
+            mahalle: found.mahalle || arr[idx].mahalle,
+            eskiAda: found.eskiAda || '',
+            eskiParsel: found.eskiParsel || '',
+            malikAdi: found.malikAdi || '',
+            planFonksiyonu: found.planFonksiyonu || '',
+          };
+          // İlk parselden alan bilgilerini de al
+          if (idx === 0) {
+            return {
+              ...f,
+              parseller: arr,
+              rayicBedel: found.rayicBedel ? String(found.rayicBedel) : f.rayicBedel,
+              arsaM2: found.alan ? String(found.alan) : f.arsaM2,
+            };
+          }
+          return { ...f, parseller: arr };
+        });
         setFormError('');
       } else {
-        setFormError('Parsel bulunamadı — bilgileri manuel giriniz.');
+        setFormError(`Satır ${idx + 1}: Parsel bulunamadı — bilgileri manuel giriniz.`);
       }
     } catch {
       setFormError('Arama sırasında hata oluştu.');
     } finally {
-      setSearching(false);
+      setSearchingIdx(null);
     }
   };
 
@@ -154,24 +177,30 @@ export default function TevhidCalculation() {
   const openCreate = () => {
     setEditId(null);
     setForm(EMPTY_FORM);
-    setSearchAda('');
-    setSearchParsel('');
-    setSearchMahalle('');
+    setSelectedFile(null);
     setFormError('');
     setFormOpen(true);
   };
 
   const openEdit = (item) => {
     setEditId(item.id);
+    const parseller = item.parseller?.length > 0
+      ? item.parseller.map(p => ({
+          parcelId: p.parcelId || null,
+          ada: p.ada || '',
+          parselNo: p.parselNo || '',
+          mahalle: p.mahalle || '',
+          eskiAda: p.eskiAda || '',
+          eskiParsel: p.eskiParsel || '',
+          malikAdi: p.malikAdi || '',
+          planFonksiyonu: p.planFonksiyonu || '',
+        }))
+      : [{ parcelId: item.parcelId || null, ada: item.ada || '', parselNo: item.parselNo || '',
+           mahalle: item.mahalle || '', eskiAda: item.eskiAda || '', eskiParsel: item.eskiParsel || '',
+           malikAdi: item.malikAdi || '', planFonksiyonu: item.planFonksiyonu || '' }];
+
     setForm({
-      parcelId: item.parcelId || null,
-      ada: item.ada || '',
-      parselNo: item.parselNo || '',
-      mahalle: item.mahalle || '',
-      eskiAda: item.eskiAda || '',
-      eskiParsel: item.eskiParsel || '',
-      malikAdi: item.malikAdi || '',
-      planFonksiyonu: item.planFonksiyonu || '',
+      parseller,
       katsayi: String(item.katsayi || ''),
       rayicBedel: String(item.rayicBedel || ''),
       arsaM2: String(item.arsaM2 || ''),
@@ -179,40 +208,56 @@ export default function TevhidCalculation() {
       cekmelerM2: String(item.cekmelerM2 || ''),
       notlar: item.notlar || '',
     });
+    setSelectedFile(null);
     setFormError('');
     setFormOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.ada || !form.parselNo || !form.mahalle || !form.katsayi || !form.rayicBedel) {
-      setFormError('Ada, Parsel No, Mahalle, Katsayı ve Rayiç Bedel zorunludur.');
+    const firstP = form.parseller[0];
+    if (!firstP?.ada || !firstP?.parselNo || !firstP?.mahalle || !form.katsayi || !form.rayicBedel) {
+      setFormError('En az 1 parsel (Ada, Parsel No, Mahalle) ile Katsayı ve Rayiç Bedel zorunludur.');
       return;
     }
     setSaving(true);
     setFormError('');
     const payload = {
-      parcelId: form.parcelId || null,
-      ada: form.ada,
-      parselNo: form.parselNo,
-      mahalle: form.mahalle,
-      eskiAda: form.eskiAda || null,
-      eskiParsel: form.eskiParsel || null,
-      malikAdi: form.malikAdi || null,
-      planFonksiyonu: form.planFonksiyonu || null,
+      ada: firstP.ada,
+      parselNo: firstP.parselNo,
+      mahalle: firstP.mahalle,
       katsayi: parseFloat(form.katsayi) || 0,
       rayicBedel: parseFloat(form.rayicBedel) || 0,
       arsaM2: parseFloat(form.arsaM2) || 0,
       taksM2: parseFloat(form.taksM2) || 0,
       cekmelerM2: parseFloat(form.cekmelerM2) || 0,
       notlar: form.notlar || null,
+      parseller: form.parseller.map((p, i) => ({
+        parcelId: p.parcelId || null,
+        ada: p.ada, parselNo: p.parselNo, mahalle: p.mahalle || null,
+        eskiAda: p.eskiAda || null, eskiParsel: p.eskiParsel || null,
+        malikAdi: p.malikAdi || null, planFonksiyonu: p.planFonksiyonu || null,
+        siraNo: i,
+      })),
     };
     try {
+      let saved;
       if (editId) {
-        await tevhidService.update(editId, payload);
+        saved = await tevhidService.update(editId, payload);
         setSuccess('Hesaplama güncellendi.');
       } else {
-        await tevhidService.create(payload);
+        saved = await tevhidService.create(payload);
         setSuccess('Hesaplama oluşturuldu.');
+      }
+      // Dosya varsa yükle
+      if (selectedFile && saved?.id) {
+        setUploading(true);
+        try {
+          await tevhidService.uploadFile(saved.id, selectedFile);
+        } catch {
+          setError('Hesaplama kaydedildi fakat dosya yüklenemedi.');
+        } finally {
+          setUploading(false);
+        }
       }
       setFormOpen(false);
       loadList();
@@ -223,34 +268,14 @@ export default function TevhidCalculation() {
     }
   };
 
-  // ── Review ────────────────────────────────────────────────────────
-  const openReview = (item) => {
-    setReviewTarget(item);
-    setReviewForm({ decision: 'Onaylandı', onaylananSenaryo: '1', reviewNote: '' });
-    setReviewError('');
-    setReviewOpen(true);
-  };
-
-  const handleReview = async () => {
-    if (reviewForm.decision === 'Onaylandı' && !reviewForm.onaylananSenaryo) {
-      setReviewError('Onaylanacak senaryoyu seçiniz.');
-      return;
-    }
-    setReviewing(true);
-    setReviewError('');
+  // ── Resubmit ──────────────────────────────────────────────────────
+  const handleResubmit = async (id) => {
     try {
-      await tevhidService.review(reviewTarget.id, {
-        decision: reviewForm.decision,
-        onaylananSenaryo: reviewForm.decision === 'Onaylandı' ? parseInt(reviewForm.onaylananSenaryo) : null,
-        reviewNote: reviewForm.reviewNote || null,
-      });
-      setSuccess('İnceleme kaydedildi.');
-      setReviewOpen(false);
+      await tevhidService.resubmit(id);
+      setSuccess('Hesaplama tekrar onaya gönderildi.');
       loadList();
     } catch (e) {
-      setReviewError(e.response?.data?.message || 'Hata oluştu.');
-    } finally {
-      setReviewing(false);
+      setError(e.response?.data?.message || 'İşlem başarısız.');
     }
   };
 
@@ -270,9 +295,7 @@ export default function TevhidCalculation() {
   const downloadBlob = (response, filename) => {
     const url = URL.createObjectURL(response.data);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -280,36 +303,29 @@ export default function TevhidCalculation() {
     try {
       const res = await tevhidService.exportAllApproved();
       downloadBlob(res, `TevhidOnaylananlar_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch {
-      setError('Excel indirilemedi.');
-    }
+    } catch { setError('Excel indirilemedi.'); }
   };
 
   const handleExportScenarios = async (id) => {
     try {
       const res = await tevhidService.exportScenarios(id);
       downloadBlob(res, `Senaryolar_${id.slice(0, 8)}.xlsx`);
-    } catch {
-      setError('Excel indirilemedi.');
-    }
+    } catch { setError('Excel indirilemedi.'); }
   };
 
   const handleExportApproved = async (id) => {
     try {
       const res = await tevhidService.exportApproved(id);
       downloadBlob(res, `Onayli_${id.slice(0, 8)}.xlsx`);
-    } catch {
-      setError('Excel indirilemedi.');
-    }
+    } catch { setError('Excel indirilemedi.'); }
   };
 
-  // ── Önizleme hesaplama ────────────────────────────────────────────
+  // ── Önizleme ─────────────────────────────────────────────────────
   const preview = {
     arsa: calcHarc(form.katsayi, form.arsaM2, form.rayicBedel),
     taks: calcHarc(form.katsayi, form.taksM2, form.rayicBedel),
     cekme: calcHarc(form.katsayi, form.cekmelerM2, form.rayicBedel),
   };
-
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -332,7 +348,7 @@ export default function TevhidCalculation() {
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
       {success && <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2 }}>{success}</Alert>}
 
-      {/* Filtre Çubuğu */}
+      {/* Filtre */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
           <TextField size="small" label="Ada" value={filterAda} onChange={e => handleFilterChange(setFilterAda)(e.target.value)} sx={{ width: 90 }} />
@@ -358,27 +374,39 @@ export default function TevhidCalculation() {
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: 'primary.main' }}>
-              {['Ada', 'Parsel', 'Mahalle', 'Malik', 'S1: Arsa Harç', 'S2: TAKS Harç', 'S3: Çekme Harç', 'Durum', 'Oluşturan', 'İşlem'].map(h => (
+              {['Parseller', 'S1: Arsa Harç', 'S2: TAKS Harç', 'S3: Çekme Harç', 'Durum', 'Dosya', 'Oluşturan', 'İşlem'].map(h => (
                 <TableCell key={h} sx={{ color: 'white', fontWeight: 600 }}>{h}</TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} align="center"><CircularProgress size={24} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} align="center"><CircularProgress size={24} /></TableCell></TableRow>
             ) : list.length === 0 ? (
-              <TableRow><TableCell colSpan={10} align="center">Kayıt yok</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} align="center">Kayıt yok</TableCell></TableRow>
             ) : list.map(item => (
               <TableRow key={item.id} hover>
-                <TableCell>{item.ada}</TableCell>
-                <TableCell>{item.parselNo}</TableCell>
-                <TableCell>{item.mahalle}</TableCell>
-                <TableCell>{item.malikAdi || '—'}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={600}>{item.ada}/{item.parselNo}</Typography>
+                  <Typography variant="caption" color="text.secondary">{item.mahalle}</Typography>
+                  {item.parseller?.length > 1 && (
+                    <Chip label={`+${item.parseller.length - 1} parsel`} size="small" sx={{ ml: 0.5, fontSize: 10 }} />
+                  )}
+                </TableCell>
                 <TableCell>{formatCurrency(item.arsaHarc)}</TableCell>
                 <TableCell>{formatCurrency(item.taksHarc)}</TableCell>
                 <TableCell>{formatCurrency(item.cekmelerHarc)}</TableCell>
                 <TableCell>
                   <Chip label={item.status} color={statusColor(item.status)} size="small" />
+                </TableCell>
+                <TableCell>
+                  {item.dosyaYolu ? (
+                    <Tooltip title="Eki Görüntüle">
+                      <IconButton size="small" component="a" href={item.dosyaYolu} target="_blank" rel="noopener">
+                        <OpenInNewIcon fontSize="small" color="primary" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : '—'}
                 </TableCell>
                 <TableCell>{item.olusturanKullanici}</TableCell>
                 <TableCell>
@@ -400,10 +428,11 @@ export default function TevhidCalculation() {
                         </IconButton>
                       </Tooltip>
                     )}
-                    {isManager && item.status === 'Bekliyor' && (
-                      <Tooltip title="İncele / Onayla">
-                        <IconButton size="small" color="primary" onClick={() => openReview(item)}>
-                          <GavelIcon fontSize="small" />
+                    {(item.status === 'Reddedildi' || item.status === 'Düzeltme İstendi') &&
+                     (isManager || item.createdByUserId === user?.id) && (
+                      <Tooltip title="Tekrar Onaya Gönder">
+                        <IconButton size="small" color="warning" onClick={() => handleResubmit(item.id)}>
+                          <ReplayIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -434,72 +463,61 @@ export default function TevhidCalculation() {
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{editId ? 'Tevhid Harcı Düzenle' : 'Yeni Tevhid Harcı Hesaplama'}</DialogTitle>
         <DialogContent dividers>
-          {/* Parsel arama */}
-          <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
-            <Typography variant="subtitle2" gutterBottom>Parselden Otomatik Getir</Typography>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Autocomplete
-                freeSolo size="small"
-                options={adaOptions}
-                inputValue={searchAda}
-                onInputChange={(_, v) => { setSearchAda(v); fetchAC('ada', v, setAdaOptions); }}
-                sx={{ width: 110 }}
-                renderInput={p => <TextField {...p} label="Ada" />}
-              />
-              <Autocomplete
-                freeSolo size="small"
-                options={parselOptions}
-                inputValue={searchParsel}
-                onInputChange={(_, v) => { setSearchParsel(v); fetchAC('parsel', v, setParselOptions); }}
-                sx={{ width: 110 }}
-                renderInput={p => <TextField {...p} label="Parsel" />}
-              />
-              <Autocomplete
-                freeSolo size="small"
-                options={mahalleOptions}
-                inputValue={searchMahalle}
-                onInputChange={(_, v) => { setSearchMahalle(v); fetchAC('mahalle', v, setMahalleOptions); }}
-                sx={{ width: 190 }}
-                renderInput={p => <TextField {...p} label="Mahalle (opsiyonel)" />}
-              />
-              <Button variant="outlined" startIcon={searching ? <CircularProgress size={16} /> : <SearchIcon />}
-                onClick={handleParcelSearch} disabled={searching}>
-                Getir
-              </Button>
-            </Stack>
-          </Paper>
-
           {formError && <Alert severity="warning" sx={{ mb: 2 }}>{formError}</Alert>}
 
+          {/* Parsel Listesi */}
+          <Typography variant="subtitle2" gutterBottom>Parseller</Typography>
+          {form.parseller.map((p, idx) => (
+            <Paper key={idx} variant="outlined" sx={{ p: 1.5, mb: 1, bgcolor: 'grey.50' }}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 20 }}>#{idx + 1}</Typography>
+                <Autocomplete
+                  freeSolo size="small"
+                  options={adaOptions}
+                  inputValue={p.ada}
+                  onInputChange={(_, v) => { updateParsel(idx, 'ada', v); fetchAC('ada', v, setAdaOptions); }}
+                  sx={{ width: 90 }}
+                  renderInput={params => <TextField {...params} label="Ada *" />}
+                />
+                <Autocomplete
+                  freeSolo size="small"
+                  options={parselOptions}
+                  inputValue={p.parselNo}
+                  onInputChange={(_, v) => { updateParsel(idx, 'parselNo', v); fetchAC('parsel', v, setParselOptions); }}
+                  sx={{ width: 90 }}
+                  renderInput={params => <TextField {...params} label="Parsel *" />}
+                />
+                <Autocomplete
+                  freeSolo size="small"
+                  options={mahalleOptions}
+                  inputValue={p.mahalle || ''}
+                  onInputChange={(_, v) => { updateParsel(idx, 'mahalle', v); fetchAC('mahalle', v, setMahalleOptions); }}
+                  sx={{ width: 160 }}
+                  renderInput={params => <TextField {...params} label="Mahalle *" />}
+                />
+                <Tooltip title="DB'den Getir">
+                  <IconButton size="small" color="primary" onClick={() => handleParcelSearch(idx)} disabled={searchingIdx === idx}>
+                    {searchingIdx === idx ? <CircularProgress size={16} /> : <SearchIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+                <TextField size="small" label="Malik" value={p.malikAdi || ''} onChange={e => updateParsel(idx, 'malikAdi', e.target.value)} sx={{ width: 140 }} />
+                <TextField size="small" label="Eski Ada" value={p.eskiAda || ''} onChange={e => updateParsel(idx, 'eskiAda', e.target.value)} sx={{ width: 80 }} />
+                <TextField size="small" label="Eski Parsel" value={p.eskiParsel || ''} onChange={e => updateParsel(idx, 'eskiParsel', e.target.value)} sx={{ width: 90 }} />
+                <TextField size="small" label="Plan Fonk." value={p.planFonksiyonu || ''} onChange={e => updateParsel(idx, 'planFonksiyonu', e.target.value)} sx={{ width: 130 }} />
+                <IconButton size="small" color="error" onClick={() => removeParsel(idx)} disabled={form.parseller.length <= 1}>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            </Paper>
+          ))}
+          <Button size="small" startIcon={<AddIcon />} onClick={addParsel} sx={{ mb: 2 }}>
+            Parsel Ekle
+          </Button>
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Hesaplama Girdileri */}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth label="Ada *" size="small" value={form.ada}
-                onChange={e => setForm(f => ({ ...f, ada: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth label="Parsel No *" size="small" value={form.parselNo}
-                onChange={e => setForm(f => ({ ...f, parselNo: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth label="Mahalle *" size="small" value={form.mahalle}
-                onChange={e => setForm(f => ({ ...f, mahalle: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField fullWidth label="Eski Ada" size="small" value={form.eskiAda}
-                onChange={e => setForm(f => ({ ...f, eskiAda: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField fullWidth label="Eski Parsel" size="small" value={form.eskiParsel}
-                onChange={e => setForm(f => ({ ...f, eskiParsel: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField fullWidth label="Malik Adı" size="small" value={form.malikAdi}
-                onChange={e => setForm(f => ({ ...f, malikAdi: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} sm={8}>
-              <TextField fullWidth label="Plan Fonksiyonu" size="small" value={form.planFonksiyonu}
-                onChange={e => setForm(f => ({ ...f, planFonksiyonu: e.target.value }))} />
-            </Grid>
             <Grid item xs={12} sm={6}>
               <TextField fullWidth label="Katsayı *" size="small" type="number"
                 inputProps={{ step: '0.001' }} value={form.katsayi}
@@ -517,63 +535,112 @@ export default function TevhidCalculation() {
 
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="S1: Arsa m²" size="small" type="number"
-                value={form.arsaM2}
-                onChange={e => setForm(f => ({ ...f, arsaM2: e.target.value }))} />
-              <Typography variant="caption" color="text.secondary">
-                Tahmini: {formatCurrency(preview.arsa)}
-              </Typography>
+                value={form.arsaM2} onChange={e => setForm(f => ({ ...f, arsaM2: e.target.value }))} />
+              <Typography variant="caption" color="text.secondary">Tahmini: {formatCurrency(preview.arsa)}</Typography>
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="S2: TAKS m²" size="small" type="number"
-                value={form.taksM2}
-                onChange={e => setForm(f => ({ ...f, taksM2: e.target.value }))} />
-              <Typography variant="caption" color="text.secondary">
-                Tahmini: {formatCurrency(preview.taks)}
-              </Typography>
+                value={form.taksM2} onChange={e => setForm(f => ({ ...f, taksM2: e.target.value }))} />
+              <Typography variant="caption" color="text.secondary">Tahmini: {formatCurrency(preview.taks)}</Typography>
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="S3: Çekmeler m²" size="small" type="number"
-                value={form.cekmelerM2}
-                onChange={e => setForm(f => ({ ...f, cekmelerM2: e.target.value }))} />
-              <Typography variant="caption" color="text.secondary">
-                Tahmini: {formatCurrency(preview.cekme)}
-              </Typography>
+                value={form.cekmelerM2} onChange={e => setForm(f => ({ ...f, cekmelerM2: e.target.value }))} />
+              <Typography variant="caption" color="text.secondary">Tahmini: {formatCurrency(preview.cekme)}</Typography>
             </Grid>
 
             <Grid item xs={12}>
               <TextField fullWidth label="Notlar" size="small" multiline rows={2}
-                value={form.notlar}
-                onChange={e => setForm(f => ({ ...f, notlar: e.target.value }))} />
+                value={form.notlar} onChange={e => setForm(f => ({ ...f, notlar: e.target.value }))} />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ mb: 1 }} />
+              <Typography variant="subtitle2" gutterBottom>Belge Ekle (opsiyonel)</Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button component="label" variant="outlined" size="small" startIcon={<AttachFileIcon />}>
+                  Dosya Seç
+                  <input type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.docx"
+                    onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
+                </Button>
+                {selectedFile ? (
+                  <Typography variant="caption">{selectedFile.name}</Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">PDF, görsel veya Word</Typography>
+                )}
+              </Stack>
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFormOpen(false)}>İptal</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}>
-            {saving ? <CircularProgress size={20} /> : (editId ? 'Güncelle' : 'Oluştur')}
+          <Button variant="contained" onClick={handleSave} disabled={saving || uploading}>
+            {saving || uploading ? <CircularProgress size={20} /> : (editId ? 'Güncelle' : 'Oluştur')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* ── Detay Dialog ──────────────────────────────────────────────── */}
-      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Tevhid Detayı</DialogTitle>
         {selected && (
           <DialogContent dividers>
-            <Grid container spacing={1}>
-              {[
-                ['Ada', selected.ada], ['Parsel', selected.parselNo], ['Mahalle', selected.mahalle],
-                ['Eski Ada', selected.eskiAda || '—'], ['Eski Parsel', selected.eskiParsel || '—'],
-                ['Malik', selected.malikAdi || '—'], ['Katsayı', selected.katsayi],
-                ['Rayiç Bedel', formatCurrency(selected.rayicBedel)],
-              ].map(([label, val]) => (
-                <Grid item xs={6} key={label}>
-                  <Typography variant="caption" color="text.secondary">{label}</Typography>
-                  <Typography variant="body2">{val}</Typography>
-                </Grid>
-              ))}
+            {/* Parsel listesi */}
+            {selected.parseller?.length > 0 ? (
+              <>
+                <Typography variant="subtitle2" gutterBottom>Parseller</Typography>
+                <TableContainer sx={{ mb: 2 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        {['Ada', 'Parsel', 'Mahalle', 'Eski Ada', 'Eski Parsel', 'Malik', 'Plan Fonk.'].map(h => (
+                          <TableCell key={h} sx={{ fontWeight: 600 }}>{h}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selected.parseller.map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{p.ada}</TableCell>
+                          <TableCell>{p.parselNo}</TableCell>
+                          <TableCell>{p.mahalle || '—'}</TableCell>
+                          <TableCell>{p.eskiAda || '—'}</TableCell>
+                          <TableCell>{p.eskiParsel || '—'}</TableCell>
+                          <TableCell>{p.malikAdi || '—'}</TableCell>
+                          <TableCell>{p.planFonksiyonu || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            ) : (
+              <Grid container spacing={1} sx={{ mb: 2 }}>
+                {[
+                  ['Ada', selected.ada], ['Parsel', selected.parselNo], ['Mahalle', selected.mahalle],
+                  ['Eski Ada', selected.eskiAda || '—'], ['Eski Parsel', selected.eskiParsel || '—'],
+                  ['Malik', selected.malikAdi || '—'],
+                ].map(([label, val]) => (
+                  <Grid item xs={6} key={label}>
+                    <Typography variant="caption" color="text.secondary">{label}</Typography>
+                    <Typography variant="body2">{val}</Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+
+            <Grid container spacing={1} sx={{ mb: 2 }}>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary">Katsayı</Typography>
+                <Typography variant="body2">{selected.katsayi}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary">Rayiç Bedel</Typography>
+                <Typography variant="body2">{formatCurrency(selected.rayicBedel)}</Typography>
+              </Grid>
             </Grid>
-            <Divider sx={{ my: 2 }} />
+
+            <Divider sx={{ my: 1 }} />
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -584,33 +651,32 @@ export default function TevhidCalculation() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  <TableRow selected={selected.onaylananSenaryo === 1}>
-                    <TableCell>S1: Arsa</TableCell>
-                    <TableCell align="right">{selected.arsaM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(selected.arsaHarc)}</TableCell>
-                  </TableRow>
-                  <TableRow selected={selected.onaylananSenaryo === 2}>
-                    <TableCell>S2: TAKS</TableCell>
-                    <TableCell align="right">{selected.taksM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(selected.taksHarc)}</TableCell>
-                  </TableRow>
-                  <TableRow selected={selected.onaylananSenaryo === 3}>
-                    <TableCell>S3: Çekmeler</TableCell>
-                    <TableCell align="right">{selected.cekmelerM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(selected.cekmelerHarc)}</TableCell>
-                  </TableRow>
+                  {[
+                    { label: 'S1: Arsa', m2: selected.arsaM2, harc: selected.arsaHarc, no: 1 },
+                    { label: 'S2: TAKS', m2: selected.taksM2, harc: selected.taksHarc, no: 2 },
+                    { label: 'S3: Çekmeler', m2: selected.cekmelerM2, harc: selected.cekmelerHarc, no: 3 },
+                  ].map(row => (
+                    <TableRow key={row.label} selected={selected.onaylananSenaryo === row.no}
+                      sx={selected.onaylananSenaryo === row.no ? { bgcolor: 'success.light' } : {}}>
+                      <TableCell>{row.label} {selected.onaylananSenaryo === row.no && <Chip label="Onaylı" size="small" color="success" sx={{ ml: 1 }} />}</TableCell>
+                      <TableCell align="right">{row.m2}</TableCell>
+                      <TableCell align="right">{formatCurrency(row.harc)}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </TableContainer>
+
             <Divider sx={{ my: 2 }} />
             <Stack spacing={0.5}>
-              <Box><Typography variant="caption" color="text.secondary">Durum</Typography>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Durum</Typography>
                 <Box><Chip label={selected.status} color={statusColor(selected.status)} size="small" /></Box>
               </Box>
               {selected.onaylananSenaryo && (
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Onaylanan Senaryo</Typography>
-                  <Typography variant="body2">Senaryo {selected.onaylananSenaryo} — {formatCurrency(selected.onaylananHarc)}</Typography>
+                  <Typography variant="caption" color="text.secondary">Onaylanan Harç</Typography>
+                  <Typography variant="body2" fontWeight={700}>{formatCurrency(selected.onaylananHarc)}</Typography>
                 </Box>
               )}
               {selected.reviewNote && (
@@ -635,85 +701,21 @@ export default function TevhidCalculation() {
                   <Typography variant="body2">{selected.notlar}</Typography>
                 </Box>
               )}
+              {selected.dosyaYolu && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ek Belge</Typography>
+                  <Box>
+                    <Button size="small" startIcon={<OpenInNewIcon />} component="a" href={selected.dosyaYolu} target="_blank" rel="noopener">
+                      Belgeyi Görüntüle
+                    </Button>
+                  </Box>
+                </Box>
+              )}
             </Stack>
           </DialogContent>
         )}
         <DialogActions>
           <Button onClick={() => setDetailOpen(false)}>Kapat</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── İnceleme Dialog ───────────────────────────────────────────── */}
-      <Dialog open={reviewOpen} onClose={() => setReviewOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Tevhid İnceleme</DialogTitle>
-        {reviewTarget && (
-          <DialogContent dividers>
-            <Typography variant="subtitle2" gutterBottom>
-              {reviewTarget.ada}/{reviewTarget.parselNo} — {reviewTarget.mahalle}
-            </Typography>
-
-            {/* Senaryo karşılaştırma */}
-            <TableContainer sx={{ mb: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Senaryo</TableCell>
-                    <TableCell align="right">m²</TableCell>
-                    <TableCell align="right">Hesaplanan Harç</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>S1: Arsa</TableCell>
-                    <TableCell align="right">{reviewTarget.arsaM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(reviewTarget.arsaHarc)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>S2: TAKS</TableCell>
-                    <TableCell align="right">{reviewTarget.taksM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(reviewTarget.taksHarc)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>S3: Çekmeler</TableCell>
-                    <TableCell align="right">{reviewTarget.cekmelerM2}</TableCell>
-                    <TableCell align="right">{formatCurrency(reviewTarget.cekmelerHarc)}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {reviewError && <Alert severity="error" sx={{ mb: 2 }}>{reviewError}</Alert>}
-
-            <FormLabel>Karar</FormLabel>
-            <RadioGroup row value={reviewForm.decision}
-              onChange={e => setReviewForm(f => ({ ...f, decision: e.target.value }))}>
-              <FormControlLabel value="Onaylandı" control={<Radio color="success" />} label="Onayla" />
-              <FormControlLabel value="Reddedildi" control={<Radio color="error" />} label="Reddet" />
-              <FormControlLabel value="Düzeltme İstendi" control={<Radio color="info" />} label="Düzeltme İste" />
-            </RadioGroup>
-
-            {reviewForm.decision === 'Onaylandı' && (
-              <Box sx={{ mt: 1 }}>
-                <FormLabel>Onaylanacak Senaryo</FormLabel>
-                <RadioGroup row value={reviewForm.onaylananSenaryo}
-                  onChange={e => setReviewForm(f => ({ ...f, onaylananSenaryo: e.target.value }))}>
-                  <FormControlLabel value="1" control={<Radio />} label="S1: Arsa" />
-                  <FormControlLabel value="2" control={<Radio />} label="S2: TAKS" />
-                  <FormControlLabel value="3" control={<Radio />} label="S3: Çekmeler" />
-                </RadioGroup>
-              </Box>
-            )}
-
-            <TextField fullWidth multiline rows={3} label="İnceleme Notu" size="small" sx={{ mt: 2 }}
-              value={reviewForm.reviewNote}
-              onChange={e => setReviewForm(f => ({ ...f, reviewNote: e.target.value }))} />
-          </DialogContent>
-        )}
-        <DialogActions>
-          <Button onClick={() => setReviewOpen(false)}>İptal</Button>
-          <Button variant="contained" onClick={handleReview} disabled={reviewing}>
-            {reviewing ? <CircularProgress size={20} /> : 'Kaydet'}
-          </Button>
         </DialogActions>
       </Dialog>
 

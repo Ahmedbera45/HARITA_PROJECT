@@ -1,4 +1,5 @@
 using Harita.API.DTOs;
+using Microsoft.AspNetCore.Http;
 
 namespace Harita.API.Services
 {
@@ -9,6 +10,8 @@ namespace Harita.API.Services
         Task<PagedResult<TevhidDto>> GetPagedAsync(string? ada, string? parsel, string? mahalle, string? status, DateTime? dateFrom, DateTime? dateTo, int page, int pageSize);
         Task<TevhidDto?> GetByIdAsync(Guid id);
         Task<TevhidDto> ReviewAsync(Guid id, ReviewTevhidDto dto);
+        Task<TevhidDto> ResubmitAsync(Guid id);
+        Task<TevhidDto> UploadFileAsync(Guid id, IFormFile file);
         Task<TevhidDto> UpdateAsync(Guid id, UpdateTevhidDto dto);
         Task<bool> DeleteAsync(Guid id);
         Task<byte[]> ExportAllApprovedAsync();

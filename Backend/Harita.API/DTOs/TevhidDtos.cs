@@ -1,5 +1,19 @@
 namespace Harita.API.DTOs
 {
+    public class TevhidParselDto
+    {
+        public Guid? Id { get; set; }
+        public Guid? ParcelId { get; set; }
+        public string Ada { get; set; } = string.Empty;
+        public string ParselNo { get; set; } = string.Empty;
+        public string? Mahalle { get; set; }
+        public string? EskiAda { get; set; }
+        public string? EskiParsel { get; set; }
+        public string? MalikAdi { get; set; }
+        public string? PlanFonksiyonu { get; set; }
+        public int SiraNo { get; set; }
+    }
+
     public class CreateTevhidDto
     {
         public Guid? ParcelId { get; set; }
@@ -16,6 +30,7 @@ namespace Harita.API.DTOs
         public double TaksM2 { get; set; }
         public double CekmelerM2 { get; set; }
         public string? Notlar { get; set; }
+        public List<TevhidParselDto> Parseller { get; set; } = new();
     }
 
     public class UpdateTevhidDto : CreateTevhidDto { }
@@ -63,5 +78,11 @@ namespace Harita.API.DTOs
         public Guid CreatedByUserId { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? Notlar { get; set; }
+
+        // Çoklu parsel
+        public List<TevhidParselDto> Parseller { get; set; } = new();
+
+        // Dosya
+        public string? DosyaYolu { get; set; }
     }
 }

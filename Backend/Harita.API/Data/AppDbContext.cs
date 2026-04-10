@@ -31,6 +31,7 @@ namespace Harita.API.Data
         public DbSet<MapLayer> MapLayers { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<ParcelCustomField> ParcelCustomFields { get; set; }
+        public DbSet<TevhidParsel> TevhidParseller { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -98,6 +99,9 @@ namespace Harita.API.Data
             modelBuilder.Entity<TevhidCalculation>()
                 .HasOne(t => t.Parcel).WithMany()
                 .HasForeignKey(t => t.ParcelId).OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<TevhidParsel>()
+                .HasOne(p => p.TevhidCalculation).WithMany(t => t.Parseller)
+                .HasForeignKey(p => p.TevhidCalculationId).OnDelete(DeleteBehavior.Cascade);
 
             // Yetki Grupları
             modelBuilder.Entity<UserPermissionGroup>()

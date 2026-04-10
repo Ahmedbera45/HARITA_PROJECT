@@ -43,5 +43,11 @@ namespace Harita.API.Entities
         public Guid? ReviewedByUserId { get; set; }
         public User? ReviewedByUser { get; set; }
         public DateTime? ReviewedAt { get; set; }
+
+        // Çoklu parsel
+        public ICollection<TevhidParsel> Parseller { get; set; } = new List<TevhidParsel>();
+
+        // Ekli dosya
+        public string? DosyaYolu { get; set; }
     }
 }

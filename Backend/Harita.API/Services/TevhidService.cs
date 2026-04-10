@@ -11,11 +11,13 @@ namespace Harita.API.Services
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _accessor;
+        private readonly IWebHostEnvironment _env;
 
-        public TevhidService(AppDbContext context, IHttpContextAccessor accessor)
+        public TevhidService(AppDbContext context, IHttpContextAccessor accessor, IWebHostEnvironment env)
         {
             _context = context;
             _accessor = accessor;
+            _env = env;
         }
 
         private Guid GetCurrentUserId()
@@ -36,19 +38,50 @@ namespace Harita.API.Services
         private static double Calc(double katsayi, double m2, decimal rayic) =>
             Math.Round(katsayi * m2 * (double)rayic, 2);
 
+        private async Task SyncParseller(Guid tevhidId, List<TevhidParselDto> parseller)
+        {
+            var existing = _context.TevhidParseller.Where(p => p.TevhidCalculationId == tevhidId);
+            _context.TevhidParseller.RemoveRange(existing);
+            for (int i = 0; i < parseller.Count; i++)
+            {
+                var p = parseller[i];
+                _context.TevhidParseller.Add(new TevhidParsel
+                {
+                    TevhidCalculationId = tevhidId,
+                    ParcelId       = p.ParcelId,
+                    Ada            = p.Ada,
+                    ParselNo       = p.ParselNo,
+                    Mahalle        = p.Mahalle,
+                    EskiAda        = p.EskiAda,
+                    EskiParsel     = p.EskiParsel,
+                    MalikAdi       = p.MalikAdi,
+                    PlanFonksiyonu = p.PlanFonksiyonu,
+                    SiraNo         = i,
+                    CreatedAt      = DateTime.UtcNow
+                });
+            }
+        }
+
         public async Task<TevhidDto> CreateAsync(CreateTevhidDto dto)
         {
             var userId = GetCurrentUserId();
+
+            // Ana parsel alanlarını Parseller listesinin ilk elemanından doldur
+            var firstParsel = dto.Parseller.FirstOrDefault();
+            var ada     = firstParsel?.Ada     ?? dto.Ada;
+            var parsel  = firstParsel?.ParselNo ?? dto.ParselNo;
+            var mahalle = firstParsel?.Mahalle  ?? dto.Mahalle;
+
             var entity = new TevhidCalculation
             {
-                ParcelId        = dto.ParcelId,
-                Ada             = dto.Ada,
-                ParselNo        = dto.ParselNo,
-                Mahalle         = dto.Mahalle,
-                EskiAda         = dto.EskiAda,
-                EskiParsel      = dto.EskiParsel,
-                MalikAdi        = dto.MalikAdi,
-                PlanFonksiyonu  = dto.PlanFonksiyonu,
+                ParcelId        = firstParsel?.ParcelId ?? dto.ParcelId,
+                Ada             = ada,
+                ParselNo        = parsel,
+                Mahalle         = mahalle,
+                EskiAda         = firstParsel?.EskiAda    ?? dto.EskiAda,
+                EskiParsel      = firstParsel?.EskiParsel  ?? dto.EskiParsel,
+                MalikAdi        = firstParsel?.MalikAdi    ?? dto.MalikAdi,
+                PlanFonksiyonu  = firstParsel?.PlanFonksiyonu ?? dto.PlanFonksiyonu,
                 Katsayi         = dto.Katsayi,
                 RayicBedel      = dto.RayicBedel,
                 ArsaM2          = dto.ArsaM2,
@@ -65,6 +98,11 @@ namespace Harita.API.Services
 
             _context.TevhidCalculations.Add(entity);
             await _context.SaveChangesAsync();
+
+            if (dto.Parseller.Count > 0)
+                await SyncParseller(entity.Id, dto.Parseller);
+            await _context.SaveChangesAsync();
+
             return await GetByIdAsync(entity.Id) ?? Map(entity, null, null);
         }
 
@@ -76,6 +114,7 @@ namespace Harita.API.Services
             var query = _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.ReviewedByUser)
+                .Include(t => t.Parseller)
                 .AsQueryable();
 
             if (!isManager)
@@ -95,6 +134,7 @@ namespace Harita.API.Services
             var query = _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.ReviewedByUser)
+                .Include(t => t.Parseller)
                 .AsQueryable();
 
             if (!isManager)
@@ -130,6 +170,7 @@ namespace Harita.API.Services
             var t = await _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.ReviewedByUser)
+                .Include(t => t.Parseller.OrderBy(p => p.SiraNo))
                 .FirstOrDefaultAsync(t => t.Id == id);
             return t == null ? null : Map(t, t.CreatedByUser, t.ReviewedByUser);
         }
@@ -159,10 +200,62 @@ namespace Harita.API.Services
                 };
             }
 
-            entity.Status          = dto.Decision;
-            entity.ReviewNote      = dto.ReviewNote;
+            entity.Status           = dto.Decision;
+            entity.ReviewNote       = dto.ReviewNote;
             entity.ReviewedByUserId = GetCurrentUserId();
-            entity.ReviewedAt      = DateTime.UtcNow;
+            entity.ReviewedAt       = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return await GetByIdAsync(id) ?? throw new Exception("Güncelleme sonrası kayıt bulunamadı.");
+        }
+
+        public async Task<TevhidDto> ResubmitAsync(Guid id)
+        {
+            var userId = GetCurrentUserId();
+            var entity = await _context.TevhidCalculations.FindAsync(id)
+                ?? throw new Exception("Hesaplama bulunamadı.");
+
+            if (!IsManager() && entity.CreatedByUserId != userId)
+                throw new UnauthorizedAccessException("Bu işlem için yetkiniz yok.");
+
+            if (entity.Status != "Reddedildi" && entity.Status != "Düzeltme İstendi")
+                throw new Exception("Sadece reddedilen veya düzeltme istenen hesaplamalar tekrar gönderilebilir.");
+
+            entity.Status           = "Bekliyor";
+            entity.ReviewNote       = null;
+            entity.ReviewedByUserId = null;
+            entity.ReviewedAt       = null;
+            entity.OnaylananSenaryo = null;
+            entity.OnaylananHarc    = null;
+            await _context.SaveChangesAsync();
+            return await GetByIdAsync(id) ?? throw new Exception("Güncelleme sonrası kayıt bulunamadı.");
+        }
+
+        public async Task<TevhidDto> UploadFileAsync(Guid id, IFormFile file)
+        {
+            var entity = await _context.TevhidCalculations.FindAsync(id)
+                ?? throw new Exception("Hesaplama bulunamadı.");
+
+            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".docx" };
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(ext))
+                throw new Exception("Sadece PDF, görsel veya Word dosyası yüklenebilir.");
+
+            var uploadsDir = Path.Combine(_env.WebRootPath ?? "wwwroot", "tevhid-uploads");
+            Directory.CreateDirectory(uploadsDir);
+
+            // Eski dosyayı sil
+            if (!string.IsNullOrEmpty(entity.DosyaYolu))
+            {
+                var oldPath = Path.Combine(_env.WebRootPath ?? "wwwroot", entity.DosyaYolu.TrimStart('/'));
+                if (File.Exists(oldPath)) File.Delete(oldPath);
+            }
+
+            var fileName = $"{id}_{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+                await file.CopyToAsync(stream);
+
+            entity.DosyaYolu = $"/tevhid-uploads/{fileName}";
             await _context.SaveChangesAsync();
             return await GetByIdAsync(id) ?? throw new Exception("Güncelleme sonrası kayıt bulunamadı.");
         }
@@ -174,30 +267,34 @@ namespace Harita.API.Services
             var entity = await _context.TevhidCalculations.FindAsync(id)
                 ?? throw new Exception("Hesaplama bulunamadı.");
 
-            entity.ParcelId     = dto.ParcelId;
-            entity.Ada          = dto.Ada;
-            entity.ParselNo     = dto.ParselNo;
-            entity.Mahalle      = dto.Mahalle;
-            entity.EskiAda      = dto.EskiAda;
-            entity.EskiParsel   = dto.EskiParsel;
-            entity.MalikAdi     = dto.MalikAdi;
-            entity.PlanFonksiyonu = dto.PlanFonksiyonu;
-            entity.Katsayi      = dto.Katsayi;
-            entity.RayicBedel   = dto.RayicBedel;
-            entity.ArsaM2       = dto.ArsaM2;
-            entity.TaksM2       = dto.TaksM2;
-            entity.CekmelerM2   = dto.CekmelerM2;
-            entity.ArsaHarc     = Calc(dto.Katsayi, dto.ArsaM2,     dto.RayicBedel);
-            entity.TaksHarc     = Calc(dto.Katsayi, dto.TaksM2,     dto.RayicBedel);
-            entity.CekmelerHarc = Calc(dto.Katsayi, dto.CekmelerM2, dto.RayicBedel);
-            entity.Notlar       = dto.Notlar;
-            // Düzenleme yapılınca durumu tekrar Bekliyor'a al
-            entity.Status          = "Bekliyor";
+            var firstParsel = dto.Parseller.FirstOrDefault();
+
+            entity.ParcelId       = firstParsel?.ParcelId ?? dto.ParcelId;
+            entity.Ada            = firstParsel?.Ada      ?? dto.Ada;
+            entity.ParselNo       = firstParsel?.ParselNo ?? dto.ParselNo;
+            entity.Mahalle        = firstParsel?.Mahalle  ?? dto.Mahalle;
+            entity.EskiAda        = firstParsel?.EskiAda    ?? dto.EskiAda;
+            entity.EskiParsel     = firstParsel?.EskiParsel  ?? dto.EskiParsel;
+            entity.MalikAdi       = firstParsel?.MalikAdi    ?? dto.MalikAdi;
+            entity.PlanFonksiyonu = firstParsel?.PlanFonksiyonu ?? dto.PlanFonksiyonu;
+            entity.Katsayi        = dto.Katsayi;
+            entity.RayicBedel     = dto.RayicBedel;
+            entity.ArsaM2         = dto.ArsaM2;
+            entity.TaksM2         = dto.TaksM2;
+            entity.CekmelerM2     = dto.CekmelerM2;
+            entity.ArsaHarc       = Calc(dto.Katsayi, dto.ArsaM2,     dto.RayicBedel);
+            entity.TaksHarc       = Calc(dto.Katsayi, dto.TaksM2,     dto.RayicBedel);
+            entity.CekmelerHarc   = Calc(dto.Katsayi, dto.CekmelerM2, dto.RayicBedel);
+            entity.Notlar         = dto.Notlar;
+            entity.Status           = "Bekliyor";
             entity.OnaylananSenaryo = null;
-            entity.OnaylananHarc   = null;
+            entity.OnaylananHarc    = null;
             entity.ReviewedByUserId = null;
-            entity.ReviewedAt      = null;
-            entity.ReviewNote      = null;
+            entity.ReviewedAt       = null;
+            entity.ReviewNote       = null;
+
+            if (dto.Parseller.Count > 0)
+                await SyncParseller(id, dto.Parseller);
 
             await _context.SaveChangesAsync();
             return await GetByIdAsync(id) ?? throw new Exception("Güncelleme sonrası kayıt bulunamadı.");
@@ -220,6 +317,7 @@ namespace Harita.API.Services
             var list = await _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.ReviewedByUser)
+                .Include(t => t.Parseller.OrderBy(p => p.SiraNo))
                 .Where(t => t.Status == "Onaylandı")
                 .OrderByDescending(t => t.ReviewedAt)
                 .ToListAsync();
@@ -267,13 +365,13 @@ namespace Harita.API.Services
         {
             var t = await _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
+                .Include(t => t.Parseller.OrderBy(p => p.SiraNo))
                 .FirstOrDefaultAsync(t => t.Id == id)
                 ?? throw new Exception("Hesaplama bulunamadı.");
 
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("3 Senaryo");
 
-            // Parsel başlığı
             ws.Cell(1, 1).Value = "Ada"; ws.Cell(1, 2).Value = t.Ada;
             ws.Cell(2, 1).Value = "Parsel"; ws.Cell(2, 2).Value = t.ParselNo;
             ws.Cell(3, 1).Value = "Mahalle"; ws.Cell(3, 2).Value = t.Mahalle;
@@ -282,13 +380,12 @@ namespace Harita.API.Services
             ws.Cell(6, 1).Value = "Rayiç Bedel (TL/m²)"; ws.Cell(6, 2).Value = (double)t.RayicBedel;
             ws.Cell(7, 1).Value = "Oluşturan"; ws.Cell(7, 2).Value = t.CreatedByUser != null ? $"{t.CreatedByUser.Name} {t.CreatedByUser.Surname}" : "";
 
-            // Tablo başlığı
             ws.Cell(9, 1).Value = "Senaryo"; ws.Cell(9, 2).Value = "Alan (m²)"; ws.Cell(9, 3).Value = "Hesaplanan Harç (TL)";
             new[] { ws.Cell(9, 1), ws.Cell(9, 2), ws.Cell(9, 3) }.ToList()
                 .ForEach(c => { c.Style.Font.Bold = true; c.Style.Fill.BackgroundColor = XLColor.LightBlue; });
 
-            ws.Cell(10, 1).Value = "Senaryo 1 — Arsa m²";    ws.Cell(10, 2).Value = t.ArsaM2;    ws.Cell(10, 3).Value = t.ArsaHarc;
-            ws.Cell(11, 1).Value = "Senaryo 2 — TAKS m²";    ws.Cell(11, 2).Value = t.TaksM2;    ws.Cell(11, 3).Value = t.TaksHarc;
+            ws.Cell(10, 1).Value = "Senaryo 1 — Arsa m²";     ws.Cell(10, 2).Value = t.ArsaM2;     ws.Cell(10, 3).Value = t.ArsaHarc;
+            ws.Cell(11, 1).Value = "Senaryo 2 — TAKS m²";     ws.Cell(11, 2).Value = t.TaksM2;     ws.Cell(11, 3).Value = t.TaksHarc;
             ws.Cell(12, 1).Value = "Senaryo 3 — Çekmeler m²"; ws.Cell(12, 2).Value = t.CekmelerM2; ws.Cell(12, 3).Value = t.CekmelerHarc;
 
             if (t.OnaylananSenaryo.HasValue)
@@ -309,6 +406,7 @@ namespace Harita.API.Services
             var t = await _context.TevhidCalculations
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.ReviewedByUser)
+                .Include(t => t.Parseller.OrderBy(p => p.SiraNo))
                 .FirstOrDefaultAsync(t => t.Id == id)
                 ?? throw new Exception("Hesaplama bulunamadı.");
 
@@ -378,7 +476,21 @@ namespace Harita.API.Services
             OlusturanKullanici  = creator != null ? $"{creator.Name} {creator.Surname}" : "",
             CreatedByUserId     = t.CreatedByUserId,
             CreatedAt           = t.CreatedAt,
-            Notlar              = t.Notlar
+            Notlar              = t.Notlar,
+            DosyaYolu           = t.DosyaYolu,
+            Parseller           = t.Parseller?.OrderBy(p => p.SiraNo).Select(p => new TevhidParselDto
+            {
+                Id             = p.Id,
+                ParcelId       = p.ParcelId,
+                Ada            = p.Ada,
+                ParselNo       = p.ParselNo,
+                Mahalle        = p.Mahalle,
+                EskiAda        = p.EskiAda,
+                EskiParsel     = p.EskiParsel,
+                MalikAdi       = p.MalikAdi,
+                PlanFonksiyonu = p.PlanFonksiyonu,
+                SiraNo         = p.SiraNo
+            }).ToList() ?? new()
         };
     }
 }

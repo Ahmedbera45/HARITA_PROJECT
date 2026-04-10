@@ -391,14 +391,6 @@ export default function Leaves() {
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                    {isManager && l.status === 'Bekliyor' && (
-                      <Button
-                        size="small" variant="outlined" color="primary"
-                        onClick={() => { setReviewTarget(l); setReviewForm({ decision: 'Onaylandı', reviewNote: '' }); setReviewOpen(true); }}
-                      >
-                        İncele
-                      </Button>
-                    )}
                     {(isManager || l.status === 'Bekliyor') && (
                       <IconButton size="small" color="error" onClick={() => { setDeleteId(l.id); setDeleteOpen(true); }}>
                         <Delete fontSize="small" />
