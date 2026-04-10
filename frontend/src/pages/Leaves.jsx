@@ -633,10 +633,13 @@ export default function Leaves() {
               <TableBody>
                 {balanceSummary.map(b => (
                   <TableRow key={b.userId} hover>
-                    <TableCell>{b.fullName}</TableCell>
-                    <TableCell align="right"><Chip label={`${b.remainingDays} gün`} size="small" color="success" /></TableCell>
-                    <TableCell align="right"><Chip label={`${b.plannedDays} gün`} size="small" color="info" /></TableCell>
-                    <TableCell align="right"><Chip label={`${b.pendingDays} gün`} size="small" color="warning" /></TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{b.userFullName}</Typography>
+                      {b.department && <Typography variant="caption" color="text.secondary">{b.department}</Typography>}
+                    </TableCell>
+                    <TableCell align="right"><Chip label={`${b.kalanIzinGunu} gün`} size="small" color="success" /></TableCell>
+                    <TableCell align="right"><Chip label={`${b.planlananIzin} gün`} size="small" color="info" /></TableCell>
+                    <TableCell align="right"><Chip label={`${b.bekleyenIzin} gün`} size="small" color="warning" /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -667,14 +670,17 @@ export default function Leaves() {
               <TableBody>
                 {hourlySummary.map(h => (
                   <TableRow key={h.userId} hover>
-                    <TableCell>{h.fullName}</TableCell>
-                    <TableCell align="right">{h.totalHourlyLeaveHours?.toFixed(1)}</TableCell>
-                    <TableCell align="right">{h.totalCompensatedHours?.toFixed(1)}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{h.userFullName}</Typography>
+                      {h.department && <Typography variant="caption" color="text.secondary">{h.department}</Typography>}
+                    </TableCell>
+                    <TableCell align="right">{h.toplamSaatlikIzin?.toFixed(1)}</TableCell>
+                    <TableCell align="right">{h.telafEdilen?.toFixed(1)}</TableCell>
                     <TableCell align="right">
                       <Chip
-                        label={`${(h.totalHourlyLeaveHours - h.totalCompensatedHours).toFixed(1)} saat`}
+                        label={`${h.telafEdilmesiGereken?.toFixed(1)} saat`}
                         size="small"
-                        color={(h.totalHourlyLeaveHours - h.totalCompensatedHours) > 0 ? 'warning' : 'success'}
+                        color={h.telafEdilmesiGereken > 0 ? 'warning' : 'success'}
                       />
                     </TableCell>
                   </TableRow>
@@ -708,13 +714,13 @@ export default function Leaves() {
             />
             <Stack direction="row" spacing={2}>
               <TextField
-                type="time" label="Başlangıç Saati" fullWidth
+                type="time" label="Başlangıç Saati (opsiyonel)" fullWidth
                 InputLabelProps={{ shrink: true }}
                 value={compForm.baslangicSaati}
                 onChange={e => setCompForm({ ...compForm, baslangicSaati: e.target.value })}
               />
               <TextField
-                type="time" label="Bitiş Saati" fullWidth
+                type="time" label="Bitiş Saati (opsiyonel)" fullWidth
                 InputLabelProps={{ shrink: true }}
                 value={compForm.bitisSaati}
                 onChange={e => setCompForm({ ...compForm, bitisSaati: e.target.value })}

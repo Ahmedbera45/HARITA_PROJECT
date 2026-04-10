@@ -60,7 +60,7 @@ export default function AllTasks() {
     const next = STATUS_NEXT[task.status];
     if (!next) return;
     try {
-      await taskService.update(task.id, { ...task, status: next, assignedUserIds: task.assignedUsers.map(u => u.id) });
+      await taskService.update(task.id, { ...task, status: next, assignedUserIds: task.assignedUsers?.map(u => u.id) ?? [] });
       load();
     } catch { toast.error('Durum güncellenemedi.'); }
   };

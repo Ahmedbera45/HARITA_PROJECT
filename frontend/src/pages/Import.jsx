@@ -498,15 +498,18 @@ export default function Import() {
 
           {lastResult && (
             <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: lastResult.errorRows > 0 ? 'warning.main' : 'success.main', borderRadius: 2 }}>
-              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: lastResult.errors.length > 0 ? 1.5 : 0 }}>
                 <Chip icon={<CheckCircle />} label={`${lastResult.successRows} başarılı`} color="success" />
                 {lastResult.errorRows > 0 && (
                   <Chip icon={<ErrorIcon />} label={`${lastResult.errorRows} hatalı`} color="error" />
                 )}
                 <Chip label={`Batch: ${lastResult.batchId}`} size="small" variant="outlined" />
+                <Button size="small" onClick={() => { setBatchFilter(lastResult.batchId); setTab(2); }}>
+                  Parsel Listesi'nde Gör →
+                </Button>
               </Stack>
               {lastResult.errors.length > 0 && (
-                <Box sx={{ maxHeight: 160, overflowY: 'auto' }}>
+                <Box sx={{ maxHeight: 160, overflowY: 'auto', bgcolor: 'background.default', borderRadius: 1, p: 1 }}>
                   {lastResult.errors.map((e, i) => (
                     <Typography key={i} variant="caption" color="error" sx={{ display: 'block' }}>• {e}</Typography>
                   ))}
@@ -517,14 +520,17 @@ export default function Import() {
 
           {mergeResult && (
             <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'success.main', borderRadius: 2 }}>
-              <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: mergeResult.errors?.length > 0 ? 1.5 : 0 }}>
                 <Chip icon={<Add />} label={`${mergeResult.inserted} yeni`} color="primary" />
                 <Chip icon={<CheckCircle />} label={`${mergeResult.updated} güncellendi`} color="success" />
                 <Chip label={`${mergeResult.skipped} atlandı`} color="default" />
                 <Chip label={`Batch: ${mergeResult.batchId}`} size="small" variant="outlined" />
+                <Button size="small" onClick={() => { setBatchFilter(mergeResult.batchId); setTab(2); }}>
+                  Parsel Listesi'nde Gör →
+                </Button>
               </Stack>
               {mergeResult.errors?.length > 0 && (
-                <Box sx={{ maxHeight: 120, overflowY: 'auto' }}>
+                <Box sx={{ maxHeight: 120, overflowY: 'auto', bgcolor: 'background.default', borderRadius: 1, p: 1 }}>
                   {mergeResult.errors.map((e, i) => (
                     <Typography key={i} variant="caption" color="error" sx={{ display: 'block' }}>• {e}</Typography>
                   ))}

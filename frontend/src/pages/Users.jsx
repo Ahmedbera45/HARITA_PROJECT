@@ -399,11 +399,11 @@ export default function Users() {
             {isEdit && (
               <TextField
                 select label="Hesap Durumu" fullWidth
-                value={form.isActive}
-                onChange={e => setForm({ ...form, isActive: e.target.value })}
+                value={String(form.isActive)}
+                onChange={e => setForm({ ...form, isActive: e.target.value === 'true' })}
               >
-                <MenuItem value={true}>Aktif</MenuItem>
-                <MenuItem value={false}>Pasif (Devre Dışı)</MenuItem>
+                <MenuItem value="true">Aktif</MenuItem>
+                <MenuItem value="false">Pasif (Devre Dışı)</MenuItem>
               </TextField>
             )}
             <Stack direction="row" spacing={2}>

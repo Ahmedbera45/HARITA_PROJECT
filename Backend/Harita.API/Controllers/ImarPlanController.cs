@@ -54,6 +54,7 @@ public class ImarPlanController : ControllerBase
 
     // POST /api/ImarPlan
     [HttpPost]
+    [Authorize(Roles = "Admin,Müdür,Şef")]
     public async Task<IActionResult> Create([FromBody] CreateImarPlanDto dto)
     {
         try

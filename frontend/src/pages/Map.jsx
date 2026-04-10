@@ -197,7 +197,7 @@ export default function Map() {
     const p = feature.properties;
     if (p) {
       layer.bindTooltip(
-        `${p.ada || '?'} / ${p.parselNo || '?'} — ${p.mahalle || ''}`,
+        `${p.ada || p.Ada || '?'} / ${p.parsel || p.Parsel || '?'} — ${p.mahalle || p.Mahalle || ''}`,
         { sticky: true, direction: 'top' }
       );
     }
@@ -321,17 +321,15 @@ export default function Map() {
             </>
           )}
 
-          {layers.filter(l => l.isVisible && layerGeoJsons[l.id]).map(l => {
+          {layers.filter(l => l.isVisible && layerGeoJsons[l.id]).map((l, idx) => {
             const gj = layerGeoJsons[l.id];
-            const isGis = l.layerType === 'gis';
+            const COLORS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#f06292','#26a69a'];
+            const color = COLORS[idx % COLORS.length];
             return (
               <GeoJSON
                 key={`${l.id}-${JSON.stringify(gj).slice(0, 20)}`}
                 data={gj}
-                style={isGis
-                  ? { color: '#6a1b9a', weight: 1.5, fillColor: '#ce93d8', fillOpacity: 0.3 }
-                  : { color: '#e65100', weight: 2, fillOpacity: 0.2 }
-                }
+                style={{ color, weight: 1.5, fillColor: color, fillOpacity: 0.2 }}
                 onEachFeature={(feature, layer) => {
                   if (feature.properties) {
                     const lines = Object.entries(feature.properties)
@@ -355,11 +353,11 @@ export default function Map() {
           </Box>
           <Divider />
           {[
-            ['Ada', selectedParcel.ada],
-            ['Parsel No', selectedParcel.parselNo],
-            ['Mahalle', selectedParcel.mahalle],
-            ['Malik', selectedParcel.malikAdi],
-            ['Alan (m²)', selectedParcel.alan ? Number(selectedParcel.alan).toLocaleString('tr-TR') : null],
+            ['Ada', selectedParcel.ada ?? selectedParcel.Ada],
+            ['Parsel No', selectedParcel.parsel ?? selectedParcel.Parsel],
+            ['Mahalle', selectedParcel.mahalle ?? selectedParcel.Mahalle],
+            ['Malik', selectedParcel.malikAdi ?? selectedParcel.MalikAdi],
+            ['Alan (m²)', (selectedParcel.alan ?? selectedParcel.Alan) ? Number(selectedParcel.alan ?? selectedParcel.Alan).toLocaleString('tr-TR') : null],
           ].map(([label, value]) => value ? (
             <Box key={label}>
               <Typography variant="caption" color="text.secondary">{label}</Typography>

@@ -260,13 +260,16 @@ namespace Harita.API.Services
                 .ToListAsync();
 
             var today = DateTime.UtcNow.Date;
+            var userIds = users.Select(u => u.Id).ToList();
+            var allLeaves = await _context.LeaveRequests
+                .Where(l => userIds.Contains(l.UserId) && !l.IsSaatlik)
+                .ToListAsync();
+
             var result = new List<LeaveBalanceSummaryDto>();
 
             foreach (var u in users)
             {
-                var leaves = await _context.LeaveRequests
-                    .Where(l => l.UserId == u.Id && !l.IsSaatlik)
-                    .ToListAsync();
+                var leaves = allLeaves.Where(l => l.UserId == u.Id).ToList();
 
                 var planned = leaves
                     .Where(l => l.Status == "Onaylandı" && l.StartDate.Date >= today)

@@ -198,7 +198,8 @@ namespace Harita.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                var inner = ex.InnerException?.InnerException?.Message ?? ex.InnerException?.Message ?? ex.Message;
+                return BadRequest($"{ex.Message} | Detay: {inner}");
             }
         }
 

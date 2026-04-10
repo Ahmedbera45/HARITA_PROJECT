@@ -61,6 +61,7 @@ namespace Harita.API.Services
             var manager = IsManager();
 
             var query = _context.Tasks
+                .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .AsQueryable();
@@ -96,6 +97,7 @@ namespace Harita.API.Services
         public async Task<TaskDto?> GetByIdAsync(Guid id)
         {
             var t = await _context.Tasks
+                .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .FirstOrDefaultAsync(t => t.Id == id);
@@ -168,7 +170,7 @@ namespace Harita.API.Services
             if (!IsManager() && task.CreatedByUserId != currentUserId)
                 throw new UnauthorizedAccessException("Bu görevi silemezsiniz.");
 
-            _context.Tasks.Remove(task);
+            task.IsDeleted = true;
             await _context.SaveChangesAsync();
             return true;
         }
@@ -178,7 +180,7 @@ namespace Harita.API.Services
             var currentUserId = GetCurrentUserId();
             var manager = IsManager();
 
-            IQueryable<AppTask> query = _context.Tasks;
+            IQueryable<AppTask> query = _context.Tasks.Where(t => !t.IsDeleted);
 
             if (!manager)
                 query = query.Where(t =>
@@ -202,6 +204,7 @@ namespace Harita.API.Services
             var manager = IsManager();
 
             var query = _context.Tasks
+                .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
                 .AsQueryable();
