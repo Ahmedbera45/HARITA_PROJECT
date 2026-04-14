@@ -98,6 +98,8 @@ builder.Services.AddScoped<IDynamicPageService, DynamicPageService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IImarPlanService, ImarPlanService>();
 builder.Services.AddScoped<IGisService, GisService>();
+builder.Services.AddScoped<ITaskFileService, TaskFileService>();
+builder.Services.AddScoped<INoteService, NoteService>();
 
 var app = builder.Build();
 
@@ -117,6 +119,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+app.UseStaticFiles();
 
 app.UseHttpsRedirection();
 

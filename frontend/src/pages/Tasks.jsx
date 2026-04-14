@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Box, Paper, Typography, Button, Grid, Card, CardContent,
   Chip, IconButton, Dialog, DialogTitle, DialogContent,
-  TextField, DialogActions, MenuItem, Tooltip, DialogContentText,
-  Stack, FormControl, InputLabel, Select, OutlinedInput, Checkbox,
-  ListItemText, AvatarGroup, Avatar, Switch, FormControlLabel
+  DialogActions, DialogContentText, Tooltip,
+  Stack, Select, MenuItem, AvatarGroup, Avatar
 } from '@mui/material';
 import {
   Add, Delete, Edit, ArrowForward, ArrowBack,
@@ -14,6 +13,12 @@ import { toast } from 'react-toastify';
 import taskService from '../services/taskService';
 import userService from '../services/userService';
 import { useAuth } from '../hooks/useAuth';
+import TaskFormDialog from '../components/TaskFormDialog';
+
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
 
 const stringToColor = (string) => {
   let hash = 0;
@@ -50,7 +55,6 @@ export default function Tasks() {
   const [filterAssignee, setFilterAssignee] = useState('');
 
   const [openDialog, setOpenDialog] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -105,39 +109,6 @@ export default function Tasks() {
     setSelectedId(task.id);
     setIsEdit(true);
     setOpenDialog(true);
-  };
-
-  const buildPayload = (fd) => ({
-    title: fd.title,
-    description: fd.description || '',
-    status: fd.status,
-    priority: fd.priority,
-    dueDate: fd.dueDate || null,
-    assignedUserIds: fd.isHerkes ? [] : (fd.assignedUserIds ?? []),
-    isHerkes: fd.isHerkes ?? false
-  });
-
-  const handleSave = async () => {
-    if (!formData.title.trim()) {
-      toast.warning('Görev başlığı zorunludur.');
-      return;
-    }
-    setSaving(true);
-    try {
-      if (isEdit) {
-        await taskService.update(selectedId, buildPayload(formData));
-        toast.success('Görev güncellendi.');
-      } else {
-        await taskService.create(buildPayload(formData));
-        toast.success('Görev oluşturuldu.');
-      }
-      setOpenDialog(false);
-      fetchTasks();
-    } catch (e) {
-      toast.error(e.response?.data?.message || e.response?.data || 'İşlem başarısız.');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleDeleteClick = (id) => {
@@ -218,7 +189,7 @@ export default function Tasks() {
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {task.description}
+                  {stripHtml(task.description)}
                 </Typography>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, pt: 1, borderTop: '1px solid #eee' }}>
@@ -331,75 +302,15 @@ export default function Tasks() {
       </Dialog>
 
       {/* Görev Oluştur / Düzenle Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{isEdit ? 'Görevi Düzenle' : 'Yeni Görev Oluştur'}</DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12 }}>
-              <TextField label="Görev Başlığı" required fullWidth
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField label="Detaylar / Açıklama" fullWidth multiline rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <TextField select label="Öncelik" fullWidth value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}>
-                <MenuItem value="Düşük">Düşük</MenuItem>
-                <MenuItem value="Orta">Orta</MenuItem>
-                <MenuItem value="Yüksek">Yüksek</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <TextField type="date" label="Son Tarih" fullWidth InputLabelProps={{ shrink: true }}
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.isHerkes}
-                    onChange={(e) => setFormData({ ...formData, isHerkes: e.target.checked, assignedUserIds: [] })}
-                    color="secondary"
-                  />
-                }
-                label="Herkese Ata (tüm kullanıcılar görür)"
-              />
-            </Grid>
-            {!formData.isHerkes && (
-              <Grid size={{ xs: 12 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Atanan Kişiler</InputLabel>
-                  <Select multiple value={formData.assignedUserIds}
-                    onChange={(e) => setFormData({ ...formData, assignedUserIds: e.target.value })}
-                    input={<OutlinedInput label="Atanan Kişiler" />}
-                    renderValue={(selected) =>
-                      users.filter(u => selected.includes(u.id)).map(u => u.fullName).join(', ') || '— Seçilmedi —'
-                    }
-                  >
-                    {users.map(u => (
-                      <MenuItem key={u.id} value={u.id}>
-                        <Checkbox checked={formData.assignedUserIds.includes(u.id)} />
-                        <ListItemText primary={u.fullName} secondary={u.department} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>İptal</Button>
-          <Button onClick={handleSave} variant="contained" disabled={saving}>
-            {saving ? 'Kaydediliyor...' : 'Kaydet'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <TaskFormDialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        onSaved={fetchTasks}
+        isEdit={isEdit}
+        initialData={formData}
+        taskId={isEdit ? selectedId : null}
+        users={users}
+      />
     </Box>
   );
 }

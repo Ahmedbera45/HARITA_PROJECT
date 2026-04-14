@@ -13,6 +13,7 @@ namespace Harita.API.DTOs
         public string CreatedByName { get; set; } = string.Empty;
         public bool IsHerkes { get; set; }
         public List<AssignedUserDto> AssignedUsers { get; set; } = new();
+        public List<TaskFileDto> Files { get; set; } = new();
     }
 
     public class AssignedUserDto
@@ -34,6 +35,17 @@ namespace Harita.API.DTOs
     }
 
     public class UpdateTaskDto : CreateTaskDto { }
+
+    public class TaskFileDto
+    {
+        public Guid Id { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public string ContentType { get; set; } = string.Empty;
+        public DateTime UploadedAt { get; set; }
+        public string UploadedByName { get; set; } = string.Empty;
+    }
 
     public class TaskSummaryDto
     {

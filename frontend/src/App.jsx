@@ -19,6 +19,7 @@ import ImarPlanlari from './pages/ImarPlanlari';
 import Approvals from './pages/Approvals';
 import Map from './pages/Map';
 import Settings from './pages/Settings';
+import Notes from './pages/Notes';
 import { useAuth, MANAGER_ROLES } from './hooks/useAuth';
 
 // Token var ve süresi dolmamış mı kontrolü
@@ -58,6 +59,7 @@ function App() {
           <Route path="/tevhid" element={<TevhidCalculation />} />
           <Route path="/imar-planlari" element={<ImarPlanlari />} />
           <Route path="/map" element={<Map />} />
+          <Route path="/notes" element={<Notes />} />
 
           {/* Dinamik sayfalar */}
           <Route path="/pages/:id" element={<DynamicPageDetail />} />

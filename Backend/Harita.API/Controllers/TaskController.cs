@@ -11,10 +11,12 @@ namespace Harita.API.Controllers
     public class TaskController : ControllerBase
     {
         private readonly ITaskService _taskService;
+        private readonly ITaskFileService _taskFileService;
 
-        public TaskController(ITaskService taskService)
+        public TaskController(ITaskService taskService, ITaskFileService taskFileService)
         {
             _taskService = taskService;
+            _taskFileService = taskFileService;
         }
 
         [HttpGet]
@@ -89,10 +91,39 @@ namespace Harita.API.Controllers
                 if (!result) return NotFound();
                 return NoContent();
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
                 return Forbid();
             }
+        }
+
+        // ─── Dosya Ekleri ───────────────────────────────────────────────
+
+        [HttpPost("{id}/files")]
+        [RequestSizeLimit(20 * 1024 * 1024 + 1024)]
+        public async Task<IActionResult> UploadFile(Guid id, IFormFile file)
+        {
+            try
+            {
+                var result = await _taskFileService.UploadAsync(id, file);
+                return Ok(result);
+            }
+            catch (Exception ex) { return BadRequest(ex.Message); }
+        }
+
+        [HttpGet("{id}/files")]
+        public async Task<IActionResult> GetFiles(Guid id)
+        {
+            var result = await _taskFileService.GetFilesAsync(id);
+            return Ok(result);
+        }
+
+        [HttpDelete("{id}/files/{fileId}")]
+        public async Task<IActionResult> DeleteFile(Guid id, Guid fileId)
+        {
+            var result = await _taskFileService.DeleteAsync(id, fileId);
+            if (!result) return NotFound();
+            return NoContent();
         }
     }
 }

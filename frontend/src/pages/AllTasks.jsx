@@ -3,14 +3,18 @@ import {
   Box, Typography, Paper, Table, TableHead, TableRow, TableCell,
   TableBody, Chip, IconButton, Tooltip, TextField, MenuItem, Select,
   FormControl, InputLabel, Stack, CircularProgress, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, Button,
 } from '@mui/material';
 import { Delete, Edit, NavigateNext } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import taskService from '../services/taskService';
 import userService from '../services/userService';
 import PaginationBar from '../components/PaginationBar';
-import api from '../services/api';
+import TaskFormDialog from '../components/TaskFormDialog';
+
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
 
 const PRIORITY_COLOR = { Düşük: 'default', Orta: 'warning', Yüksek: 'error' };
 const STATUS_COLOR = { Bekliyor: 'warning', İşlemde: 'info', Bitti: 'success' };
@@ -30,8 +34,6 @@ export default function AllTasks() {
   const [pageSize, setPageSize] = useState(20);
 
   const [editTask, setEditTask] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,7 +46,7 @@ export default function AllTasks() {
         search: filterText || undefined,
         assignedUserId: filterUser || undefined,
       };
-      const result = await api.get('/Task/paged', { params }).then(r => r.data);
+      const result = await taskService.getPaged(params);
       setItems(result.items);
       setTotal(result.total);
     } catch { toast.error('Görevler yüklenemedi.'); }
@@ -76,26 +78,6 @@ export default function AllTasks() {
 
   const openEdit = (task) => {
     setEditTask(task);
-    setEditForm({
-      title: task.title,
-      description: task.description || '',
-      status: task.status,
-      priority: task.priority,
-      dueDate: task.dueDate ? task.dueDate.substring(0, 10) : '',
-      isHerkes: task.isHerkes,
-      assignedUserIds: task.assignedUsers?.map(u => u.id) || [],
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    setSaving(true);
-    try {
-      await taskService.update(editTask.id, editForm);
-      toast.success('Görev güncellendi.');
-      setEditTask(null);
-      load();
-    } catch { toast.error('Güncellenemedi.'); }
-    finally { setSaving(false); }
   };
 
   return (
@@ -160,7 +142,7 @@ export default function AllTasks() {
                     <Typography variant="body2" fontWeight={500}>{t.title}</Typography>
                     {t.description && (
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
-                        {t.description}
+                        {stripHtml(t.description)}
                       </Typography>
                     )}
                   </TableCell>
@@ -204,40 +186,25 @@ export default function AllTasks() {
       )}
 
       {/* Düzenleme Dialog */}
-      <Dialog open={!!editTask} onClose={() => setEditTask(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Görevi Düzenle</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} mt={1}>
-            <TextField label="Başlık" value={editForm.title || ''} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} fullWidth />
-            <TextField label="Açıklama" multiline rows={2} value={editForm.description || ''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} fullWidth />
-            <Stack direction="row" spacing={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Durum</InputLabel>
-                <Select label="Durum" value={editForm.status || ''} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
-                  <MenuItem value="Bekliyor">Bekliyor</MenuItem>
-                  <MenuItem value="İşlemde">İşlemde</MenuItem>
-                  <MenuItem value="Bitti">Bitti</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth size="small">
-                <InputLabel>Öncelik</InputLabel>
-                <Select label="Öncelik" value={editForm.priority || ''} onChange={e => setEditForm(f => ({ ...f, priority: e.target.value }))}>
-                  <MenuItem value="Düşük">Düşük</MenuItem>
-                  <MenuItem value="Orta">Orta</MenuItem>
-                  <MenuItem value="Yüksek">Yüksek</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-            <TextField label="Bitiş Tarihi" type="date" value={editForm.dueDate || ''} onChange={e => setEditForm(f => ({ ...f, dueDate: e.target.value }))} InputLabelProps={{ shrink: true }} fullWidth size="small" />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditTask(null)}>İptal</Button>
-          <Button variant="contained" onClick={handleSaveEdit} disabled={saving}>
-            {saving ? <CircularProgress size={20} /> : 'Kaydet'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {editTask && (
+        <TaskFormDialog
+          open={!!editTask}
+          onClose={() => setEditTask(null)}
+          onSaved={load}
+          isEdit
+          initialData={{
+            title: editTask.title,
+            description: editTask.description || '',
+            status: editTask.status,
+            priority: editTask.priority,
+            dueDate: editTask.dueDate ? editTask.dueDate.substring(0, 10) : '',
+            isHerkes: editTask.isHerkes,
+            assignedUserIds: editTask.assignedUsers?.map(u => u.id) || [],
+          }}
+          taskId={editTask.id}
+          users={users}
+        />
+      )}
     </Box>
   );
 }

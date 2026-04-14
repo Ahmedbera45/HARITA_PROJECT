@@ -52,6 +52,18 @@ namespace Harita.API.Services
                 Id         = a.User.Id,
                 FullName   = $"{a.User.Name} {a.User.Surname}",
                 Department = a.User.Department
+            }).ToList() ?? new(),
+            Files = t.Files?.Where(f => !f.IsDeleted).Select(f => new TaskFileDto
+            {
+                Id             = f.Id,
+                FileName       = f.FileName,
+                FilePath       = f.FilePath,
+                FileSize       = f.FileSize,
+                ContentType    = f.ContentType,
+                UploadedAt     = f.CreatedAt,
+                UploadedByName = f.UploadedByUser != null
+                    ? $"{f.UploadedByUser.Name} {f.UploadedByUser.Surname}".Trim()
+                    : "",
             }).ToList() ?? new()
         };
 
@@ -64,6 +76,7 @@ namespace Harita.API.Services
                 .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
+                .Include(t => t.Files.Where(f => !f.IsDeleted)).ThenInclude(f => f.UploadedByUser)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -100,6 +113,7 @@ namespace Harita.API.Services
                 .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
+                .Include(t => t.Files.Where(f => !f.IsDeleted)).ThenInclude(f => f.UploadedByUser)
                 .FirstOrDefaultAsync(t => t.Id == id);
 
             return t == null ? null : MapToDto(t);
@@ -207,6 +221,7 @@ namespace Harita.API.Services
                 .Where(t => !t.IsDeleted)
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.Assignments).ThenInclude(a => a.User)
+                .Include(t => t.Files.Where(f => !f.IsDeleted)).ThenInclude(f => f.UploadedByUser)
                 .AsQueryable();
 
             // Role-based visibility

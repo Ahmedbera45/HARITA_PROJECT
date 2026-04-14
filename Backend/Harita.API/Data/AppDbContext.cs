@@ -32,6 +32,11 @@ namespace Harita.API.Data
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<ParcelCustomField> ParcelCustomFields { get; set; }
         public DbSet<TevhidParsel> TevhidParseller { get; set; }
+        public DbSet<TaskFile> TaskFiles { get; set; }
+        public DbSet<Note> Notes { get; set; }
+        public DbSet<NoteCategory> NoteCategories { get; set; }
+        public DbSet<NoteShare> NoteShares { get; set; }
+        public DbSet<NoteFile> NoteFiles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -149,6 +154,46 @@ namespace Harita.API.Data
             modelBuilder.Entity<ImarPlanEk>()
                 .HasOne(e => e.Ekleyen).WithMany()
                 .HasForeignKey(e => e.EkleyenId).OnDelete(DeleteBehavior.Restrict);
+
+            // Görev dosyaları
+            modelBuilder.Entity<TaskFile>()
+                .HasOne(f => f.Task).WithMany(t => t.Files)
+                .HasForeignKey(f => f.TaskId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<TaskFile>()
+                .HasOne(f => f.UploadedByUser).WithMany()
+                .HasForeignKey(f => f.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+            // Not kategorileri
+            modelBuilder.Entity<NoteCategory>()
+                .HasOne(c => c.User).WithMany()
+                .HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+
+            // Notlar
+            modelBuilder.Entity<Note>()
+                .HasOne(n => n.User).WithMany()
+                .HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Note>()
+                .HasOne(n => n.Category).WithMany(c => c.Notes)
+                .HasForeignKey(n => n.CategoryId).OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<Note>()
+                .HasOne(n => n.LastEditedByUser).WithMany()
+                .HasForeignKey(n => n.LastEditedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+            // Not paylaşımları
+            modelBuilder.Entity<NoteShare>()
+                .HasOne(s => s.Note).WithMany(n => n.Shares)
+                .HasForeignKey(s => s.NoteId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<NoteShare>()
+                .HasOne(s => s.SharedWithUser).WithMany()
+                .HasForeignKey(s => s.SharedWithUserId).OnDelete(DeleteBehavior.Restrict);
+
+            // Not dosyaları
+            modelBuilder.Entity<NoteFile>()
+                .HasOne(f => f.Note).WithMany(n => n.Files)
+                .HasForeignKey(f => f.NoteId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<NoteFile>()
+                .HasOne(f => f.UploadedByUser).WithMany()
+                .HasForeignKey(f => f.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

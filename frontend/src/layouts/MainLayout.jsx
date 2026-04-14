@@ -40,6 +40,7 @@ import {
   AccountBalance as ImarIcon,
   Approval as ApprovalIcon,
   FormatListBulleted as AllTasksIcon,
+  StickyNote2 as NoteIcon,
 } from '@mui/icons-material';
 import { logout } from '../services/authService';
 import { useAuth, MANAGER_ROLES } from '../hooks/useAuth';
@@ -56,6 +57,7 @@ const STATIC_MENU_ITEMS = [
   { text: 'Kurum Rehberi',   icon: <PeopleIcon />,     path: '/directory',       roles: [],                                   module: 'rehber' },
   { text: 'Görev Takip',     icon: <AssignmentIcon />, path: '/tasks',           roles: [],                                   module: 'gorev' },
   { text: 'Tüm Görevler',    icon: <AllTasksIcon />,   path: '/all-tasks',       roles: ['Admin', 'Müdür', 'Şef'] },
+  { text: 'Notlarım',        icon: <NoteIcon />,        path: '/notes',           roles: [] },
   { text: 'İzin Yönetimi',   icon: <LeaveIcon />,      path: '/leaves',          roles: [],                                   module: 'izin' },
   { text: 'Veri Yükle',      icon: <ImportIcon />,     path: '/import',          roles: [],                                   module: 'veriYukleme' },
   { text: 'Harç Hesaplama',  icon: <CalculateIcon />,  path: '/fee-calculation', roles: [],                                   module: 'harc' },

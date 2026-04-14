@@ -17,5 +17,8 @@ namespace Harita.API.Entities
 
         // Çoklu atama — TaskAssignment join tablosu üzerinden
         public ICollection<TaskAssignment> Assignments { get; set; } = new List<TaskAssignment>();
+
+        // Ek dosyalar
+        public ICollection<TaskFile> Files { get; set; } = new List<TaskFile>();
     }
 }
